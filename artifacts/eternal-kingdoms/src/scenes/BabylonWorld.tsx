@@ -22,15 +22,9 @@ interface BabylonWorldProps {
 
 function hasWebGL(): boolean {
   try {
-    const canvas = document.createElement("canvas");
-    return !!(
-      canvas.getContext("webgl2") ||
-      canvas.getContext("webgl") ||
-      canvas.getContext("experimental-webgl")
-    );
-  } catch {
-    return false;
-  }
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl2") || c.getContext("webgl") || c.getContext("experimental-webgl"));
+  } catch { return false; }
 }
 
 export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
@@ -45,16 +39,12 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
   }, [onStateChange]);
 
   useEffect(() => {
-    if (!hasWebGL()) {
-      setWebglError(true);
-      return;
-    }
-
+    if (!hasWebGL()) { setWebglError(true); return; }
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    let engine: Engine | null = null;
     let decTimer: ReturnType<typeof setTimeout> | null = null;
+    let engine: Engine | null = null;
 
     try {
       engine = new Engine(canvas, true, {
@@ -65,29 +55,35 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
       });
 
       const scene = new Scene(engine);
-      scene.clearColor = new Color4(0.38, 0.52, 0.72, 1.0);
-      scene.fogMode = Scene.FOGMODE_EXP2;
-      scene.fogColor = new Color3(0.48, 0.60, 0.78);
-      scene.fogDensity = 0.0042;
+
+      // LOK sky: bright blue sky
+      scene.clearColor = new Color4(0.48, 0.68, 0.88, 1.0);
+
+      // Very subtle fog (LOK has a clean horizon)
+      scene.fogMode = Scene.FOGMODE_LINEAR;
+      scene.fogColor = new Color3(0.58, 0.75, 0.90);
+      scene.fogStart = 200;
+      scene.fogEnd = 350;
 
       const { camera, getState } = createIsometricCamera(scene, canvas);
 
-      const hemi = new HemisphericLight("hemi", new Vector3(0.3, 1, 0.3), scene);
-      hemi.intensity = 0.82;
-      hemi.diffuse = new Color3(1.0, 0.95, 0.85);
-      hemi.groundColor = new Color3(0.28, 0.35, 0.22);
-      hemi.specular = new Color3(0.1, 0.1, 0.1);
+      // Bright daylight lighting matching LOK
+      const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
+      hemi.intensity = 1.1;
+      hemi.diffuse = new Color3(1.0, 0.97, 0.90);
+      hemi.groundColor = new Color3(0.35, 0.45, 0.28);
+      hemi.specular = new Color3(0.05, 0.05, 0.05);
 
-      const sun = new DirectionalLight("sun", new Vector3(-0.6, -1, -0.5), scene);
-      sun.intensity = 1.1;
-      sun.diffuse = new Color3(1.0, 0.92, 0.78);
-      sun.specular = new Color3(0.15, 0.12, 0.08);
-      sun.position = new Vector3(60, 120, 50);
+      const sun = new DirectionalLight("sun", new Vector3(-0.5, -1, -0.4), scene);
+      sun.intensity = 0.75;
+      sun.diffuse = new Color3(1.0, 0.95, 0.80);
+      sun.specular = new Color3(0.05, 0.05, 0.04);
+      sun.position = new Vector3(80, 150, 60);
 
       const shadowGen = new ShadowGenerator(1024, sun);
       shadowGen.useBlurExponentialShadowMap = true;
-      shadowGen.blurKernel = 16;
-      shadowGen.bias = 0.001;
+      shadowGen.blurKernel = 12;
+      shadowGen.bias = 0.002;
 
       const kingdoms = generateKingdomPositions();
       createTerrain(scene);
@@ -95,22 +91,19 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
 
       decTimer = setTimeout(() => {
         createDecorations(scene, kingdoms.map((k) => ({ x: k.x, z: k.z })));
-      }, 300);
+      }, 200);
 
       let frameCount = 0;
       engine.runRenderLoop(() => {
         scene.render();
         frameCount++;
         if (frameCount % 20 === 0) {
-          const camState = getState();
+          const { zoom } = getState();
           const target = camera.target;
           onStateChange((prev: WorldState) => ({
             ...prev,
-            coords: {
-              x: Math.round(target.x * 10) / 10,
-              z: Math.round(target.z * 10) / 10,
-            },
-            zoom: camState.zoom,
+            coords: { x: Math.round(target.x * 10) / 10, z: Math.round(target.z * 10) / 10 },
+            zoom,
           }));
         }
       });
@@ -128,33 +121,17 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
     } catch (err) {
       console.error("Babylon.js init error:", err);
       setWebglError(true);
-      return () => {
-        if (decTimer) clearTimeout(decTimer);
-      };
+      return () => { if (decTimer) clearTimeout(decTimer); };
     }
   }, [handleSelect, onStateChange]);
 
   if (webglError) {
     return (
-      <div
-        className="w-full h-full flex flex-col items-center justify-center"
-        style={{
-          background: "radial-gradient(ellipse at center, #1a3520 0%, #0d1f0e 50%, #060d07 100%)",
-        }}
-      >
-        <div
-          className="mmo-panel p-8 max-w-md text-center"
-          style={{ border: "1px solid rgba(201,162,39,0.5)" }}
-        >
-          <div className="mmo-title text-2xl mb-3" style={{ color: "#c9a227" }}>
-            ETERNAL KINGDOMS
-          </div>
-          <div className="mmo-text text-base opacity-70 mb-4">
-            WebGL is required to render the world map.
-          </div>
-          <div className="mmo-text text-sm opacity-50">
-            Please open this app in a browser with WebGL support enabled.
-          </div>
+      <div className="w-full h-full flex items-center justify-center"
+        style={{ background: "radial-gradient(ellipse, #1a4020 0%, #0a1a0c 100%)" }}>
+        <div className="mmo-panel p-8 max-w-md text-center">
+          <div className="mmo-title text-2xl mb-3" style={{ color: "#c9a227" }}>ETERNAL KINGDOMS</div>
+          <div className="mmo-text text-sm opacity-60">WebGL is required to render the world map.</div>
         </div>
       </div>
     );
