@@ -56,28 +56,26 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
 
       const scene = new Scene(engine);
 
-      // LOK sky: bright blue sky
-      scene.clearColor = new Color4(0.48, 0.68, 0.88, 1.0);
-
-      // Very subtle fog (LOK has a clean horizon)
+      // LOK sky colour
+      scene.clearColor = new Color4(0.50, 0.70, 0.88, 1.0);
       scene.fogMode = Scene.FOGMODE_LINEAR;
-      scene.fogColor = new Color3(0.58, 0.75, 0.90);
-      scene.fogStart = 200;
-      scene.fogEnd = 350;
+      scene.fogColor = new Color3(0.58, 0.76, 0.92);
+      scene.fogStart = 220;
+      scene.fogEnd = 360;
 
-      const { camera, getState } = createIsometricCamera(scene, canvas);
+      const { getState } = createIsometricCamera(scene, canvas);
 
-      // Bright daylight lighting matching LOK
+      // Bright daylight — matches LOK's saturated greens
       const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
-      hemi.intensity = 1.1;
-      hemi.diffuse = new Color3(1.0, 0.97, 0.90);
-      hemi.groundColor = new Color3(0.35, 0.45, 0.28);
-      hemi.specular = new Color3(0.05, 0.05, 0.05);
+      hemi.intensity = 1.15;
+      hemi.diffuse = new Color3(1.0, 0.98, 0.92);
+      hemi.groundColor = new Color3(0.38, 0.48, 0.28);
+      hemi.specular = new Color3(0.04, 0.04, 0.04);
 
-      const sun = new DirectionalLight("sun", new Vector3(-0.5, -1, -0.4), scene);
-      sun.intensity = 0.75;
-      sun.diffuse = new Color3(1.0, 0.95, 0.80);
-      sun.specular = new Color3(0.05, 0.05, 0.04);
+      const sun = new DirectionalLight("sun", new Vector3(-0.5, -1.0, -0.4), scene);
+      sun.intensity = 0.65;
+      sun.diffuse = new Color3(1.0, 0.95, 0.82);
+      sun.specular = new Color3(0.04, 0.04, 0.03);
       sun.position = new Vector3(80, 150, 60);
 
       const shadowGen = new ShadowGenerator(1024, sun);
@@ -98,12 +96,10 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
         scene.render();
         frameCount++;
         if (frameCount % 20 === 0) {
-          const { zoom } = getState();
-          const target = camera.target;
+          const { coordX, coordZ } = getState();
           onStateChange((prev: WorldState) => ({
             ...prev,
-            coords: { x: Math.round(target.x * 10) / 10, z: Math.round(target.z * 10) / 10 },
-            zoom,
+            coords: { x: coordX, z: coordZ },
           }));
         }
       });
@@ -142,7 +138,7 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
       id="babylon-canvas"
       ref={canvasRef}
       className="w-full h-full block"
-      style={{ touchAction: "none", outline: "none" }}
+      style={{ touchAction: "none", outline: "none", cursor: "grab" }}
       data-testid="babylon-canvas"
     />
   );

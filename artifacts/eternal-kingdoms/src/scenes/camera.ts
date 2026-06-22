@@ -2,108 +2,121 @@ import {
   ArcRotateCamera,
   Scene,
   Vector3,
-  Tools,
 } from "@babylonjs/core";
 
 export interface CameraState {
-  zoom: number;
+  coordX: number;
+  coordZ: number;
 }
 
 export function createIsometricCamera(scene: Scene, canvas: HTMLCanvasElement): {
   camera: ArcRotateCamera;
   getState: () => CameraState;
 } {
-  // LOK-style: nearly top-down, slight angle
-  const camera = new ArcRotateCamera(
-    "isoCamera",
-    -Math.PI / 4,       // alpha: 45° yaw
-    0.42,               // beta: ~24° from zenith = near top-down
-    90,
-    new Vector3(0, 0, 0),
-    scene,
-  );
+  // Fixed LOK-style isometric camera — no zoom, no rotation
+  const FIXED_ALPHA = -Math.PI / 4;   // 45° yaw
+  const FIXED_BETA  = 0.40;            // ~23° from zenith — near top-down
+  const FIXED_RADIUS = 95;             // fixed distance — never changes
 
-  camera.lowerRadiusLimit = 25;
-  camera.upperRadiusLimit = 220;
-  camera.lowerBetaLimit = Tools.ToRadians(15);
-  camera.upperBetaLimit = Tools.ToRadians(50);
-  camera.upperAlphaLimit = camera.alpha;
-  camera.lowerAlphaLimit = camera.alpha;
+  const camera = new ArcRotateCamera("isoCamera", FIXED_ALPHA, FIXED_BETA, FIXED_RADIUS, Vector3.Zero(), scene);
 
-  camera.panningSensibility = 60;
-  camera.wheelPrecision = 2.5;
-  camera.pinchPrecision = 4;
-  camera.inertia = 0.88;
-  camera.panningInertia = 0.82;
+  // Hard-lock everything except panning target
+  camera.lowerRadiusLimit = FIXED_RADIUS;
+  camera.upperRadiusLimit = FIXED_RADIUS;
+  camera.lowerBetaLimit   = FIXED_BETA;
+  camera.upperBetaLimit   = FIXED_BETA;
+  camera.lowerAlphaLimit  = FIXED_ALPHA;
+  camera.upperAlphaLimit  = FIXED_ALPHA;
 
-  camera.attachControl(canvas, true);
+  // Disable all built-in inputs — we handle panning ourselves
+  camera.inputs.clear();
 
-  // Middle-click or Alt+drag panning
-  let isPanning = false;
+  // ──────────────────────────────────────────────
+  // Drag panning (left-button drag)
+  // ──────────────────────────────────────────────
+  let dragging = false;
   let lastX = 0;
   let lastY = 0;
 
+  // Speed calibrated to FIXED_RADIUS / field-of-view
+  const PAN_SPEED = 0.14;
+
   canvas.addEventListener("pointerdown", (e) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey) || e.button === 2) {
-      isPanning = true;
+    if (e.button === 0 || e.button === 1 || e.button === 2) {
+      dragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
+      canvas.setPointerCapture(e.pointerId);
       e.preventDefault();
     }
   });
 
   canvas.addEventListener("pointermove", (e) => {
-    if (!isPanning) return;
-    const dx = (e.clientX - lastX) * 0.10;
-    const dy = (e.clientY - lastY) * 0.10;
+    if (!dragging) return;
+    const dx = (e.clientX - lastX) * PAN_SPEED;
+    const dy = (e.clientY - lastY) * PAN_SPEED;
     lastX = e.clientX;
     lastY = e.clientY;
+
+    // Project screen-space drag onto world XZ
     const alpha = camera.alpha;
     camera.target.x -= Math.cos(alpha) * dx - Math.sin(alpha) * dy;
     camera.target.z -= Math.sin(alpha) * dx + Math.cos(alpha) * dy;
+
+    clampTarget(camera);
   });
 
-  canvas.addEventListener("pointerup", () => { isPanning = false; });
-  canvas.addEventListener("pointerleave", () => { isPanning = false; });
+  canvas.addEventListener("pointerup", (e) => {
+    dragging = false;
+    canvas.releasePointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener("pointerleave", () => { dragging = false; });
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // Edge panning
+  // ──────────────────────────────────────────────
+  // Edge-auto-scroll (mouse near screen edge)
+  // ──────────────────────────────────────────────
   let mouseX = 0;
   let mouseY = 0;
-  canvas.addEventListener("mousemove", (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+  const EDGE_THRESHOLD = 55;
+  const EDGE_SPEED = 0.32;
 
-  const edgeThreshold = 60;
-  const edgeSpeed = 0.28;
+  window.addEventListener("mousemove", (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+
   const edgeInterval = setInterval(() => {
+    if (dragging) return;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
-    const alpha = camera.alpha;
     let dx = 0, dy = 0;
-    if (mouseX < edgeThreshold) dx = -edgeSpeed;
-    if (mouseX > w - edgeThreshold) dx = edgeSpeed;
-    if (mouseY < edgeThreshold) dy = -edgeSpeed;
-    if (mouseY > h - edgeThreshold) dy = edgeSpeed;
+    if (mouseX < EDGE_THRESHOLD)     dx = -EDGE_SPEED;
+    if (mouseX > w - EDGE_THRESHOLD) dx =  EDGE_SPEED;
+    if (mouseY < EDGE_THRESHOLD)     dy = -EDGE_SPEED;
+    if (mouseY > h - EDGE_THRESHOLD) dy =  EDGE_SPEED;
+
     if (dx !== 0 || dy !== 0) {
+      const alpha = camera.alpha;
       camera.target.x += Math.cos(alpha) * dx - Math.sin(alpha) * dy;
       camera.target.z += Math.sin(alpha) * dx + Math.cos(alpha) * dy;
+      clampTarget(camera);
     }
   }, 16);
 
-  window.addEventListener("ek-zoom", ((e: CustomEvent) => {
-    const delta = e.detail.delta;
-    camera.radius = Math.max(
-      camera.lowerRadiusLimit!,
-      Math.min(camera.upperRadiusLimit!, camera.radius + delta * 1.5),
-    );
-  }) as EventListener);
+  scene.onDisposeObservable.add(() => {
+    clearInterval(edgeInterval);
+    window.removeEventListener("mousemove", () => {});
+  });
 
-  scene.onDisposeObservable.add(() => clearInterval(edgeInterval));
+  function clampTarget(cam: ArcRotateCamera) {
+    const LIMIT = 220;
+    cam.target.x = Math.max(-LIMIT, Math.min(LIMIT, cam.target.x));
+    cam.target.z = Math.max(-LIMIT, Math.min(LIMIT, cam.target.z));
+  }
 
-  const getState = (): CameraState => {
-    const range = camera.upperRadiusLimit! - camera.lowerRadiusLimit!;
-    const zoom = Math.round(100 - ((camera.radius - camera.lowerRadiusLimit!) / range) * 100);
-    return { zoom };
-  };
+  const getState = (): CameraState => ({
+    coordX: Math.round(camera.target.x * 10) / 10,
+    coordZ: Math.round(camera.target.z * 10) / 10,
+  });
 
   return { camera, getState };
 }

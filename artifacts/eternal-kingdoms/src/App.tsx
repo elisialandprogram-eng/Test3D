@@ -5,26 +5,16 @@ import { useState, useCallback } from "react";
 export interface WorldState {
   coords: { x: number; z: number };
   selected: { name: string; type: string; level: number } | null;
-  zoom: number;
 }
 
 function App() {
   const [worldState, setWorldState] = useState<WorldState>({
     coords: { x: 0, z: 0 },
     selected: null,
-    zoom: 75,
   });
 
   const handleStateChange = useCallback((updater: (prev: WorldState) => WorldState) => {
     setWorldState(updater);
-  }, []);
-
-  const onZoomIn = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("ek-zoom", { detail: { delta: -10 } }));
-  }, []);
-
-  const onZoomOut = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("ek-zoom", { detail: { delta: 10 } }));
   }, []);
 
   return (
@@ -33,9 +23,6 @@ function App() {
       <HUD
         coords={worldState.coords}
         selected={worldState.selected}
-        zoom={worldState.zoom}
-        onZoomIn={onZoomIn}
-        onZoomOut={onZoomOut}
       />
     </div>
   );
