@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Eternal Kingdoms"
+version = "1.0.0"
+id = "artifacts/eternal-kingdoms"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22434
+
+[services.development]
+run = "pnpm --filter @workspace/eternal-kingdoms run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/eternal-kingdoms", "run", "build" ]
+publicDir = "artifacts/eternal-kingdoms/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22434"
+BASE_PATH = "/"

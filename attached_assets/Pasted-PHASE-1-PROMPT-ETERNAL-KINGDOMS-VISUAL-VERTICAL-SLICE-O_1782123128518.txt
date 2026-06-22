@@ -1,0 +1,224 @@
+PHASE 1 PROMPT — ETERNAL KINGDOMS VISUAL VERTICAL SLICE
+OBJECTIVE
+
+Build a Babylon.js visual prototype that recreates the visual feel, readability, scale, and camera presentation of the League of Kingdoms world map.
+
+This is NOT a gameplay phase.
+
+This is NOT a backend phase.
+
+This is NOT a networking phase.
+
+This phase exists solely to achieve the correct visual style.
+
+The final result should look like a professional MMO kingdom world map screenshot.
+
+REPOSITORY GOAL
+
+Create a completely new Babylon.js + React + TypeScript project.
+
+Use:
+
+Babylon.js
+React
+TypeScript
+Vite
+Tailwind
+
+No Unity.
+No Unreal.
+No editor-generated content.
+
+Everything must be generated and configured through code.
+
+CRITICAL INSTRUCTIONS
+
+DO NOT CREATE:
+
+cubes
+box kingdoms
+placeholder rectangles
+voxel terrain
+Minecraft terrain
+visible tile grids
+debug geometry
+colored primitive shapes
+wireframes
+
+The world must never look like a prototype.
+
+The world must immediately resemble a stylized fantasy MMO map.
+
+TARGET VISUAL REFERENCE
+
+Use the attached League of Kingdoms world map image as the visual reference.
+
+Analyze:
+
+camera angle
+kingdom scale
+ground appearance
+decorative density
+object spacing
+world readability
+
+The goal is NOT pixel-perfect copying.
+
+The goal is matching the visual language.
+
+CAMERA REQUIREMENTS
+
+Create a fixed isometric camera.
+
+Target:
+
+pitch approximately 60 degrees
+yaw approximately -45 degrees
+
+Requirements:
+
+smooth zoom
+zoom limits
+edge panning
+drag panning
+
+The camera should feel identical to a kingdom strategy MMO.
+
+TERRAIN REQUIREMENTS
+
+Create a large world terrain surface.
+
+DO NOT use visible square tiles.
+
+The player must not see the coordinate system.
+
+Terrain should use:
+
+painted fantasy grassland style
+blended textures
+soft color variation
+natural transitions
+
+Terrain should feel hand-painted and stylized.
+
+NOT realistic.
+
+NOT photorealistic.
+
+WORLD DECORATION
+
+Procedurally place decorative objects:
+
+tree clusters
+bushes
+rocks
+ruins
+
+Requirements:
+
+randomized placement
+natural spacing
+varied rotation
+varied scale
+
+The goal is to break visual repetition.
+
+The terrain should never appear empty.
+
+KINGDOM PROTOTYPE
+
+Create ONE showcase kingdom.
+
+This kingdom is the centerpiece of the scene.
+
+Requirements:
+
+fantasy castle silhouette
+stylized proportions
+readable from distance
+visually impressive
+
+DO NOT use primitive geometry.
+
+The kingdom should appear as a complete fantasy settlement.
+
+Use imported stylized assets if necessary.
+
+WORLD POPULATION
+
+After the showcase kingdom is complete:
+
+Spawn approximately:
+
+20 kingdoms
+
+distributed across the terrain.
+
+Requirements:
+
+varied orientation
+varied visual themes
+appropriate spacing
+
+The map should feel inhabited.
+
+PERFORMANCE REQUIREMENTS
+
+Use Babylon best practices:
+
+instancing
+thin instances
+frustum culling
+asset reuse
+
+The scene should maintain high FPS.
+
+UI REQUIREMENTS
+
+Create a minimal MMO UI overlay:
+
+Top Left:
+
+player name
+coordinates
+
+Top Right:
+
+zoom controls
+
+Bottom Left:
+
+selected object panel placeholder
+
+Bottom Right:
+
+minimap placeholder
+
+UI should be clean and modern.
+
+SUCCESS CRITERIA
+
+This phase is complete ONLY if:
+
+The scene no longer looks like a technical prototype.
+No visible grids exist.
+No cubes exist.
+No placeholder kingdoms exist.
+The camera feels like League of Kingdoms.
+The terrain feels like a fantasy MMO world.
+The kingdom silhouette is recognizable from zoomed-out view.
+A screenshot could be mistaken for an early MMO world-map mockup.
+DELIVERABLES
+
+Provide:
+
+Babylon scene architecture
+React integration
+Camera system
+Terrain system
+Decoration system
+Kingdom rendering system
+Asset loading pipeline
+Screenshot of final scene
+
+Do not begin gameplay systems, networking, combat, resources, alliances, NFTs, or backend development until this visual milestone is approved.
