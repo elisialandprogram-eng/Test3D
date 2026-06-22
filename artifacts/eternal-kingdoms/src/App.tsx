@@ -1,31 +1,37 @@
-import { BabylonWorld } from "./scenes/BabylonWorld";
+import { useState, useCallback, useRef } from "react";
+import { BabylonWorld, WorldStateUpdate } from "./scenes/BabylonWorld";
 import { HUD } from "./components/HUD";
-import { useState, useCallback } from "react";
+import type { ViewMode } from "./engine/CameraEngine";
+import { WORLD_CENTER } from "./engine/CoordinateEngine";
 
-export interface WorldState {
-  coords: { x: number; z: number };
-  selected: { name: string; type: string; level: number } | null;
-}
+const INITIAL_STATE: WorldStateUpdate = {
+  coord: { x: WORLD_CENTER.x, y: WORLD_CENTER.y },
+  zone: "D4",
+  viewMode: "FIELD",
+  selected: null,
+  cameraTarget: { x: WORLD_CENTER.x, z: WORLD_CENTER.y },
+  cameraRadius: 250,
+};
 
-function App() {
-  const [worldState, setWorldState] = useState<WorldState>({
-    coords: { x: 0, z: 0 },
-    selected: null,
-  });
+export default function App() {
+  const [worldState, setWorldState] = useState<WorldStateUpdate>(INITIAL_STATE);
+  const viewModeCallbackRef = useRef<((mode: ViewMode) => void) | null>(null);
 
-  const handleStateChange = useCallback((updater: (prev: WorldState) => WorldState) => {
-    setWorldState(updater);
+  const handleStateChange = useCallback(
+    (updater: (prev: WorldStateUpdate) => WorldStateUpdate) => {
+      setWorldState(updater);
+    },
+    []
+  );
+
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    viewModeCallbackRef.current?.(mode);
   }, []);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black">
       <BabylonWorld onStateChange={handleStateChange} />
-      <HUD
-        coords={worldState.coords}
-        selected={worldState.selected}
-      />
+      <HUD state={worldState} onViewModeChange={handleViewModeChange} />
     </div>
   );
 }
-
-export default App;

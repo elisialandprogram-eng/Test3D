@@ -12,13 +12,13 @@ version = "1.0.0"
 [[services]]
 name = "web"
 paths = [ "/" ]
-localPort = 22434
+localPort = 8080
 
 [services.development]
-run = "pnpm --filter @workspace/eternal-kingdoms run dev"
+run = "pnpm --filter @workspace/api-server run dev"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/eternal-kingdoms", "run", "build" ]
+build = [ "pnpm", "--filter", "@workspace/api-server", "run", "build" ]
 publicDir = "artifacts/eternal-kingdoms/dist/public"
 serve = "static"
 
@@ -27,5 +27,5 @@ from = "/*"
 to = "/index.html"
 
 [services.env]
-PORT = "22434"
+PORT = "8080"
 BASE_PATH = "/"

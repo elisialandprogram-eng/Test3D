@@ -1,0 +1,623 @@
+# ETERNAL KINGDOMS
+# PHASE 1 + PHASE 2 MASTER BUILD PROMPT
+# BABYLON.JS | REACT | TYPESCRIPT | REPLIT
+
+You are building Eternal Kingdoms from scratch.
+
+DO NOT use previous project architecture.
+
+DO NOT create a terrain game.
+
+DO NOT create a procedural world.
+
+DO NOT create mountains, rivers, forests, biomes, terrain chunks, or landscape generation.
+
+This project follows the design philosophy of League of Kingdoms.
+
+The world is a giant coordinate-based MMO strategy board.
+
+Everything important is placed on coordinates.
+
+====================================================================
+PROJECT STACK
+====================================================================
+
+Frontend:
+
+- Babylon.js
+- TypeScript
+- React
+- Vite
+- Tailwind
+
+Requirements:
+
+- Runs in Replit
+- Clean architecture
+- Modular systems
+- MMO scalable
+
+====================================================================
+CORE WORLD PHILOSOPHY
+====================================================================
+
+The world is NOT terrain.
+
+The world is NOT geography.
+
+The world is a coordinate board.
+
+Imagine:
+
+3072 x 3072 giant chessboard
+
+but invisible.
+
+Players only see:
+
+- grass background
+- castles
+- shrines
+- congress
+- monsters
+- resources
+- alliance overlays
+
+The coordinate system is the actual game.
+
+====================================================================
+PHASE 1
+WORLD FOUNDATION ENGINE
+====================================================================
+
+GOAL:
+
+Create the entire coordinate-based world framework.
+
+No gameplay.
+
+No combat.
+
+No blockchain.
+
+No NFTs.
+
+No alliances.
+
+No economy.
+
+Only foundation systems.
+
+====================================================================
+WORLD SIZE
+====================================================================
+
+World Coordinates:
+
+3072 x 3072
+
+Coordinate Range:
+
+X: 0 → 3071
+
+Y: 0 → 3071
+
+World Center:
+
+1536,1536
+
+Everything uses coordinate math.
+
+====================================================================
+WORLD FLOOR
+====================================================================
+
+Create a single continuous world plane.
+
+Requirements:
+
+- perfectly flat
+- no height
+- no terrain
+- no chunks visible
+- no parcel visibility
+- no biome generation
+
+Visual:
+
+single seamless stylized grass texture.
+
+The player should feel like they are viewing a strategy board.
+
+====================================================================
+LAND SYSTEM
+====================================================================
+
+Internal Only.
+
+Never visible.
+
+World contains:
+
+65536 lands
+
+Layout:
+
+256 x 256
+
+Land Size:
+
+12 x 12 coordinates
+
+Formula:
+
+LandX = floor(X / 12)
+
+LandY = floor(Y / 12)
+
+LandID =
+(LandY * 256)
++ LandX
++ 1
+
+Store internally.
+
+Never render.
+
+Never display.
+
+Never draw boundaries.
+
+====================================================================
+ZONE SYSTEM
+====================================================================
+
+World contains:
+
+64 Zones
+
+Layout:
+
+8 x 8
+
+Zone Labels:
+
+A1-H8
+
+Each Zone:
+
+384 x 384 coordinates
+
+Formula:
+
+3072 / 8 = 384
+
+Store:
+
+Zone Name
+
+Zone Coordinates
+
+Zone Center
+
+Zone Bounds
+
+Zones should only become visible in World View.
+
+====================================================================
+COORDINATE SYSTEM
+====================================================================
+
+Implement full coordinate engine.
+
+Requirements:
+
+- mouse hover coordinates
+- world coordinate conversion
+- coordinate picking
+- camera-to-coordinate translation
+
+UI:
+
+X: 1534
+Y: 2011
+
+Must always be accurate.
+
+====================================================================
+CAMERA SYSTEM
+====================================================================
+
+Implement MMO strategy camera.
+
+Requirements:
+
+- isometric view
+- drag panning
+- edge scrolling
+- smooth zoom
+- zoom inertia
+- camera boundaries
+- smooth interpolation
+
+Camera should feel like:
+
+League of Kingdoms
+
+Rise of Kingdoms
+
+Call of Dragons
+
+====================================================================
+VIEW MODES
+====================================================================
+
+MODE 1
+
+FIELD VIEW
+
+Default view.
+
+Displays:
+
+- floor
+- assets
+- world entities
+
+------------------------------------------------
+
+MODE 2
+
+WORLD VIEW
+
+Maximum zoom.
+
+Hide detailed assets.
+
+Show:
+
+- zone layout
+- ownership overlays
+- heatmaps
+
+------------------------------------------------
+
+MODE 3
+
+KINGDOM VIEW
+
+Separate scene.
+
+Placeholder only.
+
+Will be expanded later.
+
+====================================================================
+WORLD CENTER
+====================================================================
+
+Place:
+
+Ancient Congress
+
+Coordinate:
+
+1536,1536
+
+Requirements:
+
+- visually dominant
+- world focal point
+- scalable structure
+
+Acts as center reference.
+
+====================================================================
+MINIMAP
+====================================================================
+
+Create minimap framework.
+
+Features:
+
+- player position
+- camera position
+- coordinate display
+
+Placeholder implementation acceptable.
+
+====================================================================
+UI
+====================================================================
+
+Top Left:
+
+Logo
+
+Coordinates
+
+Current Zone
+
+------------------------------------------------
+
+Top Right:
+
+Zoom Controls
+
+View Switch Buttons
+
+------------------------------------------------
+
+Bottom Left:
+
+Selection Panel
+
+Placeholder
+
+------------------------------------------------
+
+Bottom Right:
+
+Minimap
+
+====================================================================
+PHASE 1 COMPLETION
+====================================================================
+
+Phase 1 is complete when:
+
+✓ 3072 world exists
+
+✓ camera works
+
+✓ coordinate engine works
+
+✓ land system works
+
+✓ zone system works
+
+✓ minimap exists
+
+✓ congress exists
+
+✓ view switching works
+
+✓ world architecture is scalable
+
+====================================================================
+PHASE 2
+WORLD OBJECT ENGINE
+====================================================================
+
+GOAL:
+
+Populate the coordinate board using coordinate-spawned entities.
+
+Still NO gameplay.
+
+Visual systems only.
+
+====================================================================
+ASSET MANAGER
+====================================================================
+
+Create centralized asset manager.
+
+All world objects must be coordinate-based.
+
+Example:
+
+spawnAsset(
+type,
+x,
+y
+)
+
+Future-proof architecture.
+
+====================================================================
+KINGDOM SYSTEM
+====================================================================
+
+Create visual kingdom objects.
+
+No gameplay.
+
+No ownership.
+
+No player accounts.
+
+Requirements:
+
+- castle model
+- walls
+- footprint system
+- coordinate placement
+
+Spawn:
+
+100 test kingdoms
+
+distributed throughout map.
+
+Support:
+
+- selection
+- hover
+- labels
+
+====================================================================
+SHRINE SYSTEM
+====================================================================
+
+Create:
+
+Shrine C
+
+Shrine B
+
+Shrine A
+
+Requirements:
+
+- unique visuals
+- scalable placement
+- coordinate registration
+
+Spawn:
+
+multiple shrines across world.
+
+====================================================================
+CONGRESS SYSTEM
+====================================================================
+
+Upgrade Ancient Congress.
+
+Requirements:
+
+- highest visual quality
+- visible from distance
+- central landmark
+
+World Position:
+
+1536,1536
+
+====================================================================
+RESOURCE NODE SYSTEM
+====================================================================
+
+Create placeholder nodes.
+
+Types:
+
+Wood
+
+Stone
+
+Food
+
+Gold
+
+Requirements:
+
+- coordinate placement
+- scalable architecture
+
+Spawn:
+
+thousands of test nodes.
+
+====================================================================
+MONSTER SYSTEM
+====================================================================
+
+Create placeholder monsters.
+
+Levels:
+
+1-10
+
+Requirements:
+
+- coordinate placement
+- idle animation support
+- selection support
+
+Spawn:
+
+hundreds across map.
+
+====================================================================
+WORLD LABEL SYSTEM
+====================================================================
+
+Display:
+
+- kingdom names
+- shrine names
+- coordinate labels
+
+Requirements:
+
+- zoom scaling
+- visibility culling
+
+====================================================================
+SELECTION SYSTEM
+====================================================================
+
+Support:
+
+- click object
+- hover object
+- selection ring
+
+Works for:
+
+- kingdoms
+- shrines
+- monsters
+- nodes
+
+====================================================================
+PERFORMANCE
+====================================================================
+
+Must support:
+
+- thousands of entities
+
+Implement:
+
+- thin instances
+- GPU instancing
+- frustum culling
+- object pooling
+
+Architecture must support MMO scale.
+
+====================================================================
+PHASE 2 COMPLETION
+====================================================================
+
+Phase 2 is complete when:
+
+✓ kingdoms spawn by coordinates
+
+✓ shrines spawn by coordinates
+
+✓ congress exists
+
+✓ nodes spawn by coordinates
+
+✓ monsters spawn by coordinates
+
+✓ selection works
+
+✓ labels work
+
+✓ performance remains smooth
+
+✓ world begins to resemble a kingdom MMO board
+
+====================================================================
+DO NOT BUILD YET
+====================================================================
+
+Do NOT build:
+
+- combat
+- alliances
+- guilds
+- blockchain
+- NFT ownership
+- resource gathering
+- marches
+- economy
+- crafting
+- research
+- heroes
+
+Only complete Phase 1 and Phase 2.

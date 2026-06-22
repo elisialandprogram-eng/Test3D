@@ -1,42 +1,68 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import {
-  Engine, Scene, HemisphericLight, DirectionalLight,
-  Vector3, Color3, Color4, ShadowGenerator, GlowLayer,
+  Engine,
+  Scene,
+  HemisphericLight,
+  DirectionalLight,
+  ShadowGenerator,
+  Vector3,
+  Color3,
+  Color4,
+  GlowLayer,
+  PointerEventTypes,
 } from "@babylonjs/core";
-import { createIsometricCamera } from "./camera";
-import { createTerrain } from "./terrain";
-import { createMountains } from "./mountains";
-import { createVegetation } from "./vegetation";
-import { createRivers } from "./rivers";
-import { createLandmarks, generateKingdomPositions } from "./landmarks";
-import type { Kingdom } from "./landmarks";
-import type { WorldState } from "../App";
 
-interface Props { onStateChange: (u: (prev: WorldState) => WorldState) => void; }
+import { createCamera, setupCameraControls, ViewMode } from "../engine/CameraEngine";
+import { worldToCoord, getZone, WORLD_SIZE } from "../engine/CoordinateEngine";
+import { createWorldFloor } from "../world/WorldFloor";
+import { createCongress } from "../world/Congress";
+import { initLandSystem } from "../systems/LandSystem";
+import { initZoneSystem, setZoneOverlayVisible } from "../systems/ZoneSystem";
+import { initKingdomSystem, setKingdomLabelsVisible } from "../systems/KingdomSystem";
+import { initShrineSystem } from "../systems/ShrineSystem";
+import { initResourceSystem } from "../systems/ResourceSystem";
+import { initMonsterSystem } from "../systems/MonsterSystem";
+import { initSelectionSystem, SelectionInfo } from "../systems/SelectionSystem";
 
-function hasWebGL() {
-  try {
-    const c=document.createElement("canvas");
-    return !!(c.getContext("webgl2")||c.getContext("webgl")||c.getContext("experimental-webgl"));
-  } catch { return false; }
+export interface WorldStateUpdate {
+  coord?: { x: number; y: number };
+  zone?: string;
+  viewMode?: ViewMode;
+  selected?: SelectionInfo | null;
+  cameraTarget?: { x: number; z: number };
+  cameraRadius?: number;
 }
 
-export function BabylonWorld({ onStateChange }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [webglError, setWebglError] = useState(false);
+interface BabylonWorldProps {
+  onStateChange: (updater: (prev: WorldStateUpdate) => WorldStateUpdate) => void;
+}
 
-  const handleSelect = useCallback((k: Kingdom) => {
-    onStateChange(prev => ({ ...prev, selected: { name:k.name, type:k.type, level:k.level } }));
-  }, [onStateChange]);
+function hasWebGL(): boolean {
+  try {
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
+
+export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const handleStateChange = useCallback(
+    (partial: Partial<WorldStateUpdate>) => {
+      onStateChange((prev) => ({ ...prev, ...partial }));
+    },
+    [onStateChange]
+  );
 
   useEffect(() => {
-    if (!hasWebGL()) { setWebglError(true); return; }
+    if (!hasWebGL()) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    let timers: ReturnType<typeof setTimeout>[] = [];
-
     let engine: Engine | null = null;
+
     try {
       engine = new Engine(canvas, true, {
         preserveDrawingBuffer: true,
@@ -46,96 +72,127 @@ export function BabylonWorld({ onStateChange }: Props) {
       });
 
       const scene = new Scene(engine);
-
-      // ── Sky ────────────────────────────────────────────────────────────────
-      scene.clearColor = new Color4(0.46, 0.68, 0.90, 1.0);
-
-      // ── Soft fog ───────────────────────────────────────────────────────────
+      scene.clearColor = new Color4(0.44, 0.67, 0.88, 1);
       scene.fogMode = Scene.FOGMODE_LINEAR;
-      scene.fogColor = new Color3(0.55, 0.72, 0.90);
-      scene.fogStart = 260;
-      scene.fogEnd   = 420;
+      scene.fogColor = new Color3(0.44, 0.67, 0.88);
+      scene.fogStart = 2600;
+      scene.fogEnd = 3400;
 
-      const { getState } = createIsometricCamera(scene, canvas);
+      const glow = new GlowLayer("WorldGlow", scene);
+      glow.intensity = 0.7;
 
-      // ── Lighting ───────────────────────────────────────────────────────────
-      const hemi = new HemisphericLight("hemi", new Vector3(0,1,0), scene);
-      hemi.intensity   = 1.30;
-      hemi.diffuse     = new Color3(1.0, 0.98, 0.92);
-      hemi.groundColor = new Color3(0.50, 0.60, 0.35);
-      hemi.specular    = Color3.Black();
+      const camera = createCamera(scene);
+      camera.attachControl(canvas, true);
+      scene.activeCamera = camera;
 
-      const sun = new DirectionalLight("sun", new Vector3(-0.5,-1.0,-0.4), scene);
-      sun.intensity = 0.45;
-      sun.diffuse   = new Color3(1.0, 0.92, 0.75);
-      sun.specular  = Color3.Black();
-      sun.position  = new Vector3(100, 180, 80);
+      const hemi = new HemisphericLight("HemiLight", new Vector3(0.2, 1, 0.3), scene);
+      hemi.intensity = 1.2;
+      hemi.diffuse = new Color3(1.0, 0.98, 0.92);
+      hemi.groundColor = new Color3(0.35, 0.45, 0.28);
 
-      const sg = new ShadowGenerator(1024, sun);
-      sg.useBlurExponentialShadowMap = true;
-      sg.blurKernel = 12;
-      sg.bias = 0.002;
+      const sun = new DirectionalLight("SunLight", new Vector3(-0.6, -1.5, -0.8).normalize(), scene);
+      sun.intensity = 0.8;
+      sun.diffuse = new Color3(1.0, 0.95, 0.8);
+      sun.position = new Vector3(WORLD_SIZE / 2, 1200, WORLD_SIZE / 2);
 
-      // ── Glow layer for magical structures ─────────────────────────────────
-      const gl = new GlowLayer("glow", scene);
-      gl.intensity = 0.7;
+      const shadowGen = new ShadowGenerator(512, sun);
+      shadowGen.useBlurExponentialShadowMap = true;
+      shadowGen.blurScale = 2;
+      shadowGen.bias = 0.001;
 
-      // ── Build world synchronously then defer expensive passes ──────────────
-      const kingdoms = generateKingdomPositions();
-      const excl = [
-        {x:0, z:0, r:28},        // Ancient Temple
-        ...kingdoms.map(k=>({x:k.x, z:k.z, r:14})),
-      ];
+      createWorldFloor(scene);
+      initLandSystem();
 
-      createTerrain(scene);
-      createRivers(scene);
-      createLandmarks(scene, kingdoms, sg, gl, handleSelect);
+      initZoneSystem(scene);
+      setZoneOverlayVisible(false); // Zones hidden in FIELD view by default
 
-      // Defer mountains + vegetation (expensive) so first frame paints fast
-      timers.push(setTimeout(() => createMountains(scene, kingdoms.map(k=>({x:k.x,z:k.z}))), 120));
-      timers.push(setTimeout(() => createVegetation(scene, excl), 350));
+      const congressMeshes = createCongress(scene);
+      for (const m of congressMeshes) {
+        try { shadowGen.addShadowCaster(m, false); } catch { /* skip */ }
+      }
 
-      // ── Render loop ────────────────────────────────────────────────────────
-      let frame = 0;
-      engine.runRenderLoop(() => {
-        scene.render();
-        if (frame++ % 20 === 0) {
-          const { coordX, coordZ } = getState();
-          onStateChange(prev => ({ ...prev, coords: { x: coordX, z: coordZ } }));
+      const kingdoms = initKingdomSystem(scene);
+      for (const k of kingdoms) {
+        for (const m of k.meshes) {
+          try { shadowGen.addShadowCaster(m, false); } catch { /* skip */ }
+        }
+      }
+
+      const shrines = initShrineSystem(scene);
+      for (const s of shrines) {
+        for (const m of s.meshes) {
+          try { shadowGen.addShadowCaster(m, false); } catch { /* skip */ }
+        }
+      }
+
+      initResourceSystem(scene);
+      initMonsterSystem(scene);
+
+      initSelectionSystem(scene, (info) => {
+        handleStateChange({ selected: info });
+      });
+
+      const _camControls = setupCameraControls(camera, scene, canvas, (mode) => {
+        setZoneOverlayVisible(mode === "WORLD");
+        handleStateChange({ viewMode: mode });
+      });
+
+      scene.onPointerObservable.add((info) => {
+        if (info.type !== PointerEventTypes.POINTERMOVE) return;
+        const evt = info.event as PointerEvent;
+        const pick = scene.pick(evt.clientX, evt.clientY, (m) => m.name === "WorldFloor");
+        if (pick?.hit && pick.pickedPoint) {
+          const coord = worldToCoord(pick.pickedPoint.x, pick.pickedPoint.z);
+          const zone = getZone(coord.x, coord.y);
+          handleStateChange({ coord, zone: zone.name });
         }
       });
 
-      const onResize = () => engine?.resize();
+      engine.resize();
+
+      let frame = 0;
+      engine.runRenderLoop(() => {
+        scene.render();
+        frame++;
+        if (frame % 6 === 0) {
+          setKingdomLabelsVisible(camera, 650);
+          handleStateChange({
+            cameraTarget: { x: camera.target.x, z: camera.target.z },
+            cameraRadius: camera.radius,
+          });
+        }
+      });
+
+      const onResize = () => engine!.resize();
       window.addEventListener("resize", onResize);
 
       return () => {
-        timers.forEach(t => clearTimeout(t));
         window.removeEventListener("resize", onResize);
-        engine?.stopRenderLoop();
+        engine!.stopRenderLoop();
         scene.dispose();
-        engine?.dispose();
+        engine!.dispose();
       };
     } catch (err) {
-      console.error("Babylon init error:", err);
-      setWebglError(true);
-      return () => timers.forEach(t => clearTimeout(t));
+      console.error("[EternalKingdoms] Scene init failed:", err);
+      engine?.dispose();
     }
-  }, [handleSelect, onStateChange]);
-
-  if (webglError) return (
-    <div className="w-full h-full flex items-center justify-center bg-[#0a1a0c]">
-      <div className="mmo-panel p-8 max-w-md text-center">
-        <div className="mmo-title text-2xl mb-3" style={{color:"#c9a227"}}>ETERNAL KINGDOMS</div>
-        <div className="mmo-text text-sm opacity-60">WebGL required — open in a WebGL-capable browser.</div>
-      </div>
-    </div>
-  );
+  }, [handleStateChange]);
 
   return (
-    <canvas ref={canvasRef} id="babylon-canvas"
-      className="w-full h-full block"
-      style={{touchAction:"none",outline:"none",cursor:"grab"}}
-      data-testid="babylon-canvas"
+    <canvas
+      ref={canvasRef}
+      id="babylon-canvas"
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        display: "block",
+        outline: "none",
+        touchAction: "none",
+        cursor: "grab",
+      }}
     />
   );
 }
