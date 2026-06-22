@@ -9,14 +9,22 @@ export function createIsometricCamera(
   scene: Scene,
   canvas: HTMLCanvasElement,
 ): { camera: ArcRotateCamera; getState: () => CameraState } {
-  // LOK-style: nearly straight-down, very slight tilt
-  const FIXED_ALPHA  = -Math.PI / 4;  // 45° yaw — classic strategy angle
-  const FIXED_BETA   = 0.24;           // ~14° from zenith — almost perfectly top-down
-  const FIXED_RADIUS = 105;            // fixed zoom — never changes
+  // alpha=0 → camera sits on the +X axis looking toward origin
+  // This makes the square world appear as a rectangle (not rotated 45° / diamond)
+  const FIXED_ALPHA  = 0;
+  const FIXED_BETA   = 0.24;   // ~14° from zenith — nearly top-down
+  const FIXED_RADIUS = 105;    // fixed distance — never changes
 
-  const camera = new ArcRotateCamera("isoCamera", FIXED_ALPHA, FIXED_BETA, FIXED_RADIUS, Vector3.Zero(), scene);
+  const camera = new ArcRotateCamera(
+    "isoCamera",
+    FIXED_ALPHA,
+    FIXED_BETA,
+    FIXED_RADIUS,
+    Vector3.Zero(),
+    scene,
+  );
 
-  // Hard-lock angle and radius
+  // Hard-lock everything — no zoom, no rotate
   camera.lowerRadiusLimit = FIXED_RADIUS;
   camera.upperRadiusLimit = FIXED_RADIUS;
   camera.lowerBetaLimit   = FIXED_BETA;
@@ -24,10 +32,23 @@ export function createIsometricCamera(
   camera.lowerAlphaLimit  = FIXED_ALPHA;
   camera.upperAlphaLimit  = FIXED_ALPHA;
 
-  // Kill all default inputs
+  // Kill all default Babylon inputs (scroll zoom, click-rotate, etc.)
   camera.inputs.clear();
 
-  // ── Drag panning ──
+  // ── World boundary ──────────────────────────────────────────────────────────
+  // Terrain is 500×500, so world runs from -250 to +250.
+  // At radius=105 / beta=0.24 the camera's frustum reveals ~55 units forward
+  // and ~95 units sideways from the target.  Clamp target to keep the border
+  // always out of frame on every side.
+  const LIMIT_X = 165;   // world ±250, minus ~85 units visible half-width
+  const LIMIT_Z = 185;   // world ±250, minus ~65 units visible half-depth
+
+  function clamp(cam: ArcRotateCamera) {
+    cam.target.x = Math.max(-LIMIT_X, Math.min(LIMIT_X, cam.target.x));
+    cam.target.z = Math.max(-LIMIT_Z, Math.min(LIMIT_Z, cam.target.z));
+  }
+
+  // ── Drag-to-pan (grab-map feel) ─────────────────────────────────────────────
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
@@ -48,6 +69,8 @@ export function createIsometricCamera(
     const dy = (e.clientY - lastY) * PAN_SPEED;
     lastX = e.clientX;
     lastY = e.clientY;
+
+    // With alpha=0: cos=1, sin=0 → x pans with horizontal drag, z pans with vertical drag
     const a = camera.alpha;
     camera.target.x -= Math.cos(a) * dx - Math.sin(a) * dy;
     camera.target.z -= Math.sin(a) * dx + Math.cos(a) * dy;
@@ -59,44 +82,15 @@ export function createIsometricCamera(
     canvas.releasePointerCapture(e.pointerId);
     canvas.style.cursor = "grab";
   });
+
   canvas.addEventListener("pointerleave", () => {
     dragging = false;
     canvas.style.cursor = "grab";
   });
+
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // ── Edge auto-scroll ──
-  let mouseX = 0;
-  let mouseY = 0;
-  const EDGE = 55;
-  const SPEED = 0.30;
-
-  window.addEventListener("mousemove", (e) => { mouseX = e.clientX; mouseY = e.clientY; });
-
-  const edgeTick = setInterval(() => {
-    if (dragging) return;
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    let dx = 0, dy = 0;
-    if (mouseX < EDGE)     dx = -SPEED;
-    if (mouseX > w - EDGE) dx =  SPEED;
-    if (mouseY < EDGE)     dy = -SPEED;
-    if (mouseY > h - EDGE) dy =  SPEED;
-    if (dx || dy) {
-      const a = camera.alpha;
-      camera.target.x += Math.cos(a) * dx - Math.sin(a) * dy;
-      camera.target.z += Math.sin(a) * dx + Math.cos(a) * dy;
-      clamp(camera);
-    }
-  }, 16);
-
-  scene.onDisposeObservable.add(() => clearInterval(edgeTick));
-
-  function clamp(cam: ArcRotateCamera) {
-    const L = 230;
-    cam.target.x = Math.max(-L, Math.min(L, cam.target.x));
-    cam.target.z = Math.max(-L, Math.min(L, cam.target.z));
-  }
+  // No edge-scroll — map only moves on explicit drag
 
   const getState = (): CameraState => ({
     coordX: Math.round(camera.target.x * 10) / 10,
