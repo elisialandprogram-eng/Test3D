@@ -1,0 +1,593 @@
+# ETERNAL KINGDOMS — PHASE 1 CONTINENT VISUAL PROTOTYPE
+# REPLIT AGENT MASTER IMPLEMENTATION PROMPT
+
+You are building a completely new game called Eternal Kingdoms.
+
+DO NOT reuse any previous project architecture.
+
+DO NOT generate placeholder MMO prototypes.
+
+DO NOT generate cubes, voxel worlds, tile grids, debug geometry, or primitive placeholders.
+
+This phase is VISUAL ONLY.
+
+No gameplay.
+No combat.
+No alliances.
+No NFT logic.
+No backend game systems.
+No resource harvesting.
+No marching.
+No multiplayer.
+
+The only objective is to create a visually impressive MMO continent map that captures the visual feel, readability, scale, and presentation quality of League of Kingdoms.
+
+====================================================================
+PROJECT STACK
+====================================================================
+
+Frontend:
+
+- Babylon.js
+- TypeScript
+- React
+- Tailwind
+- Vite
+
+Requirements:
+
+- Entire project must run in Replit
+- No Unity
+- No Unreal
+- No editor-generated content
+- No manual scene assembly
+- Everything must be code-driven
+- Everything must be runtime-generated
+
+====================================================================
+VISUAL REFERENCE GOAL
+====================================================================
+
+Analyze League of Kingdoms world map presentation.
+
+The objective is NOT to clone League of Kingdoms.
+
+The objective is to reproduce:
+
+- visual readability
+- camera presentation
+- kingdom prominence
+- continent scale
+- biome diversity
+- world atmosphere
+
+The final screenshot should immediately resemble a professional fantasy MMO strategy world map.
+
+A player should instantly recognize:
+
+- kingdoms
+- forests
+- mountains
+- rivers
+- landmarks
+
+The world must feel alive.
+
+====================================================================
+WORLD SPECIFICATION
+====================================================================
+
+World Coordinates:
+
+3072 x 3072
+
+Coordinate Range:
+
+(0,0)
+to
+(3071,3071)
+
+World Center:
+
+(1536,1536)
+
+Center Landmark:
+
+Ancient Temple
+
+This is the visual focal point of the continent.
+
+====================================================================
+LAND SYSTEM
+====================================================================
+
+Internal Data Only.
+
+DO NOT VISUALIZE LAND BORDERS.
+
+Total NFT Lands:
+
+65536
+
+Land Grid:
+
+256 x 256
+
+Land Size:
+
+12 x 12 coordinates
+
+Formula:
+
+LandX = floor(WorldX / 12)
+
+LandY = floor(WorldY / 12)
+
+TokenId =
+(LandY * 256)
++ LandX
++ 1
+
+These calculations should exist in code but NEVER be rendered visually.
+
+Players must never see parcel boundaries.
+
+====================================================================
+ZONE SYSTEM
+====================================================================
+
+64 Zones
+
+8 x 8 Layout
+
+Each Zone:
+
+32 x 32 Lands
+
+1024 Lands per Zone
+
+Zone labels:
+
+A1-H8
+
+Center Zones:
+
+D4
+E4
+D5
+E5
+
+These zones form the Royal Core.
+
+The Royal Core contains:
+
+- Ancient Temple
+- Highest visual quality terrain
+- Largest landmarks
+- Endgame structures
+
+DO NOT render zone borders.
+
+====================================================================
+CAMERA REQUIREMENTS
+====================================================================
+
+Create a professional MMO strategy camera.
+
+Requirements:
+
+- Fixed isometric presentation
+- Pitch approximately 60 degrees
+- Yaw approximately -45 degrees
+
+Support:
+
+- mouse wheel zoom
+- smooth zoom interpolation
+- drag panning
+- edge scrolling
+- camera inertia
+- zoom limits
+
+Camera should feel similar to:
+
+- League of Kingdoms
+- Rise of Kingdoms
+- Call of Dragons
+
+The camera is one of the most important systems.
+
+====================================================================
+VISUAL STYLE
+====================================================================
+
+Target Style:
+
+Stylized Fantasy
+
+NOT:
+
+- realistic
+- photorealistic
+- voxel
+- Minecraft
+- low-effort procedural
+
+Terrain should feel:
+
+- hand painted
+- colorful
+- readable
+- MMO friendly
+
+The world should prioritize readability over realism.
+
+====================================================================
+BIOME SYSTEM
+====================================================================
+
+Create five major biome types.
+
+Biome 1:
+
+PLAINS
+
+Visuals:
+
+- lush green grass
+- open landscape
+- scattered trees
+
+Resource Identity:
+
+balanced
+
+=================================================
+
+Biome 2:
+
+AGRICULTURAL
+
+Visuals:
+
+- farmland
+- crop fields
+- cultivated terrain
+
+Resource Identity:
+
+food
+
+=================================================
+
+Biome 3:
+
+FOREST
+
+Visuals:
+
+- dense tree clusters
+- darker greenery
+- woodland clearings
+
+Resource Identity:
+
+lumber
+
+=================================================
+
+Biome 4:
+
+MOUNTAIN
+
+Visuals:
+
+- rocky terrain
+- cliffs
+- stone formations
+
+Resource Identity:
+
+stone
+
+=================================================
+
+Biome 5:
+
+WATERFRONT
+
+Visuals:
+
+- rivers
+- lakes
+- shorelines
+
+Resource Identity:
+
+gold and trade
+
+=================================================
+
+Biome transitions must be smooth.
+
+Avoid hard biome edges.
+
+Use blending techniques.
+
+====================================================================
+TERRAIN GENERATION
+====================================================================
+
+DO NOT create visible tiles.
+
+DO NOT create visible squares.
+
+DO NOT create a checkerboard.
+
+DO NOT expose the coordinate grid.
+
+Terrain should appear organic.
+
+Generate:
+
+- grass variation
+- dirt variation
+- worn paths
+- vegetation patches
+- natural clearings
+
+Terrain should look like artwork.
+
+====================================================================
+RIVER SYSTEM
+====================================================================
+
+Generate major rivers.
+
+Requirements:
+
+- flow across multiple zones
+- connect lakes
+- create natural biome borders
+
+Visuals:
+
+- reflective water
+- shoreline blending
+- vegetation near banks
+
+Rivers should become major visual landmarks.
+
+====================================================================
+WORLD DECORATION
+====================================================================
+
+Generate large amounts of environmental clutter.
+
+Examples:
+
+- tree clusters
+- bushes
+- rocks
+- ruins
+- broken pillars
+- abandoned camps
+- vegetation patches
+
+Requirements:
+
+- random rotation
+- random scale
+- natural distribution
+
+The world should never feel empty.
+
+====================================================================
+VEGETATION SYSTEM
+====================================================================
+
+DO NOT USE SPHERES FOR TREES.
+
+DO NOT USE GREEN CIRCLES.
+
+DO NOT USE PRIMITIVE GEOMETRY.
+
+Create stylized fantasy trees.
+
+Requirements:
+
+- visible trunks
+- visible canopies
+- shadow casting
+
+Support:
+
+- GPU instancing
+- thin instances
+
+Generate forests using clustered placement.
+
+====================================================================
+MOUNTAIN SYSTEM
+====================================================================
+
+Create mountain ranges.
+
+Requirements:
+
+- visually recognizable
+- natural formation
+- multiple elevations
+
+Mountains should break terrain monotony.
+
+Mountain zones should feel distinct.
+
+====================================================================
+KINGDOM SYSTEM
+====================================================================
+
+Create visual-only kingdoms.
+
+No gameplay.
+
+No ownership.
+
+No progression.
+
+The kingdom exists only to test world readability.
+
+Create one HERO KINGDOM.
+
+Requirements:
+
+- fantasy castle
+- towers
+- walls
+- glowing effects
+- highly visible silhouette
+
+The hero kingdom should be the best-looking structure in the scene.
+
+After hero kingdom is complete:
+
+Generate approximately:
+
+30-50 kingdoms
+
+distributed naturally throughout the continent.
+
+Requirements:
+
+- varied appearance
+- varied orientation
+- proper spacing
+
+The world should feel populated.
+
+====================================================================
+SHRINES
+====================================================================
+
+Create visual shrine landmarks.
+
+Types:
+
+Shrine C
+Shrine B
+Shrine A
+
+Requirements:
+
+- unique silhouettes
+- magical effects
+- visible from distance
+
+A Shrines must appear closest to center.
+
+====================================================================
+ANCIENT TEMPLE
+====================================================================
+
+Create the largest structure on the map.
+
+Location:
+
+(1536,1536)
+
+Requirements:
+
+- monumental architecture
+- glowing magical energy
+- visually dominant
+
+The Ancient Temple must be visible from far away.
+
+This is the ultimate focal point.
+
+====================================================================
+ATMOSPHERIC EFFECTS
+====================================================================
+
+Add:
+
+- soft fog
+- ambient lighting
+- bloom
+- shadows
+- subtle particles
+
+Goal:
+
+Increase fantasy atmosphere.
+
+Do not overuse effects.
+
+Maintain clarity.
+
+====================================================================
+PERFORMANCE REQUIREMENTS
+====================================================================
+
+Must support future MMO scale.
+
+Use:
+
+- GPU instancing
+- thin instances
+- frustum culling
+- object pooling architecture
+- LOD-ready structure
+
+Avoid creating thousands of unique meshes.
+
+Build scalable systems.
+
+====================================================================
+UI REQUIREMENTS
+====================================================================
+
+Create a minimal overlay.
+
+Top Left:
+
+- Eternal Kingdoms logo
+- Coordinates
+
+Top Right:
+
+- Zoom controls
+
+Bottom Left:
+
+- Selected object panel placeholder
+
+Bottom Right:
+
+- Minimap placeholder
+
+UI should be clean and modern.
+
+====================================================================
+SUCCESS CRITERIA
+====================================================================
+
+This phase is complete ONLY if:
+
+1. The world does NOT look procedural.
+2. The world does NOT look like a prototype.
+3. No cubes exist.
+4. No voxel terrain exists.
+5. No visible tile grid exists.
+6. No visible land boundaries exist.
+7. Forests look like forests.
+8. Mountains look like mountains.
+9. Rivers look like rivers.
+10. Kingdoms are immediately recognizable.
+11. Ancient Temple dominates the center.
+12. The camera feels like a modern kingdom MMO.
+13. A screenshot could reasonably be mistaken for an early production MMO world map.
+
+DO NOT begin gameplay, networking, combat, NFT systems, alliance systems, resource systems, or backend implementation.
+
+Only build the visual continent prototype until approval is given.

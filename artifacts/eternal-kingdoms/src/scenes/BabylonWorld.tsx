@@ -1,41 +1,32 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
-  Engine,
-  Scene,
-  HemisphericLight,
-  DirectionalLight,
-  Vector3,
-  Color3,
-  Color4,
-  ShadowGenerator,
+  Engine, Scene, HemisphericLight, DirectionalLight,
+  Vector3, Color3, Color4, ShadowGenerator, GlowLayer,
 } from "@babylonjs/core";
 import { createIsometricCamera } from "./camera";
 import { createTerrain } from "./terrain";
-import { createDecorations } from "./decorations";
-import { createKingdoms, generateKingdomPositions } from "./kingdoms";
-import type { Kingdom } from "./kingdoms";
+import { createMountains } from "./mountains";
+import { createVegetation } from "./vegetation";
+import { createRivers } from "./rivers";
+import { createLandmarks, generateKingdomPositions } from "./landmarks";
+import type { Kingdom } from "./landmarks";
 import type { WorldState } from "../App";
 
-interface BabylonWorldProps {
-  onStateChange: (updater: (prev: WorldState) => WorldState) => void;
-}
+interface Props { onStateChange: (u: (prev: WorldState) => WorldState) => void; }
 
-function hasWebGL(): boolean {
+function hasWebGL() {
   try {
-    const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl") || c.getContext("experimental-webgl"));
+    const c=document.createElement("canvas");
+    return !!(c.getContext("webgl2")||c.getContext("webgl")||c.getContext("experimental-webgl"));
   } catch { return false; }
 }
 
-export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
+export function BabylonWorld({ onStateChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [webglError, setWebglError] = useState(false);
 
   const handleSelect = useCallback((k: Kingdom) => {
-    onStateChange((prev: WorldState) => ({
-      ...prev,
-      selected: { name: k.name, type: k.type, level: k.level },
-    }));
+    onStateChange(prev => ({ ...prev, selected: { name:k.name, type:k.type, level:k.level } }));
   }, [onStateChange]);
 
   useEffect(() => {
@@ -43,7 +34,7 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    let decTimer: ReturnType<typeof setTimeout> | null = null;
+    let timers: ReturnType<typeof setTimeout>[] = [];
 
     let engine: Engine | null = null;
     try {
@@ -56,53 +47,61 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
 
       const scene = new Scene(engine);
 
-      // LOK sky — bright daylight blue
-      scene.clearColor = new Color4(0.53, 0.74, 0.92, 1.0);
+      // ── Sky ────────────────────────────────────────────────────────────────
+      scene.clearColor = new Color4(0.46, 0.68, 0.90, 1.0);
+
+      // ── Soft fog ───────────────────────────────────────────────────────────
       scene.fogMode = Scene.FOGMODE_LINEAR;
-      scene.fogColor = new Color3(0.60, 0.78, 0.94);
-      scene.fogStart = 230;
-      scene.fogEnd = 380;
+      scene.fogColor = new Color3(0.55, 0.72, 0.90);
+      scene.fogStart = 260;
+      scene.fogEnd   = 420;
 
       const { getState } = createIsometricCamera(scene, canvas);
 
-      // ── Lighting: LOK is very bright, flat, almost no shadows ─────────────────
-      // Strong hemisphere = flat even brightness matching LOK's painted look
-      const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
-      hemi.intensity    = 1.35;
-      hemi.diffuse      = new Color3(1.0, 1.0, 0.96);
-      hemi.groundColor  = new Color3(0.55, 0.65, 0.40);
-      hemi.specular     = Color3.Black();
+      // ── Lighting ───────────────────────────────────────────────────────────
+      const hemi = new HemisphericLight("hemi", new Vector3(0,1,0), scene);
+      hemi.intensity   = 1.30;
+      hemi.diffuse     = new Color3(1.0, 0.98, 0.92);
+      hemi.groundColor = new Color3(0.50, 0.60, 0.35);
+      hemi.specular    = Color3.Black();
 
-      // Weak sun just for very subtle depth on buildings
-      const sun = new DirectionalLight("sun", new Vector3(-0.4, -1.0, -0.3), scene);
-      sun.intensity = 0.28;
-      sun.diffuse   = new Color3(1.0, 0.95, 0.80);
+      const sun = new DirectionalLight("sun", new Vector3(-0.5,-1.0,-0.4), scene);
+      sun.intensity = 0.45;
+      sun.diffuse   = new Color3(1.0, 0.92, 0.75);
       sun.specular  = Color3.Black();
-      sun.position  = new Vector3(80, 150, 60);
+      sun.position  = new Vector3(100, 180, 80);
 
-      // Shadow only for castles (not terrain)
-      const sg = new ShadowGenerator(512, sun);
+      const sg = new ShadowGenerator(1024, sun);
       sg.useBlurExponentialShadowMap = true;
-      sg.blurKernel = 8;
-      sg.bias = 0.003;
+      sg.blurKernel = 12;
+      sg.bias = 0.002;
 
+      // ── Glow layer for magical structures ─────────────────────────────────
+      const gl = new GlowLayer("glow", scene);
+      gl.intensity = 0.7;
+
+      // ── Build world synchronously then defer expensive passes ──────────────
       const kingdoms = generateKingdomPositions();
+      const excl = [
+        {x:0, z:0, r:28},        // Ancient Temple
+        ...kingdoms.map(k=>({x:k.x, z:k.z, r:14})),
+      ];
+
       createTerrain(scene);
-      createKingdoms(scene, kingdoms, sg, handleSelect);
+      createRivers(scene);
+      createLandmarks(scene, kingdoms, sg, gl, handleSelect);
 
-      decTimer = setTimeout(() => {
-        createDecorations(scene, kingdoms.map((k) => ({ x: k.x, z: k.z })));
-      }, 250);
+      // Defer mountains + vegetation (expensive) so first frame paints fast
+      timers.push(setTimeout(() => createMountains(scene, kingdoms.map(k=>({x:k.x,z:k.z}))), 120));
+      timers.push(setTimeout(() => createVegetation(scene, excl), 350));
 
+      // ── Render loop ────────────────────────────────────────────────────────
       let frame = 0;
       engine.runRenderLoop(() => {
         scene.render();
         if (frame++ % 20 === 0) {
           const { coordX, coordZ } = getState();
-          onStateChange((prev: WorldState) => ({
-            ...prev,
-            coords: { x: coordX, z: coordZ },
-          }));
+          onStateChange(prev => ({ ...prev, coords: { x: coordX, z: coordZ } }));
         }
       });
 
@@ -110,7 +109,7 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
       window.addEventListener("resize", onResize);
 
       return () => {
-        if (decTimer) clearTimeout(decTimer);
+        timers.forEach(t => clearTimeout(t));
         window.removeEventListener("resize", onResize);
         engine?.stopRenderLoop();
         scene.dispose();
@@ -119,28 +118,23 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
     } catch (err) {
       console.error("Babylon init error:", err);
       setWebglError(true);
-      return () => { if (decTimer) clearTimeout(decTimer); };
+      return () => timers.forEach(t => clearTimeout(t));
     }
   }, [handleSelect, onStateChange]);
 
-  if (webglError) {
-    return (
-      <div className="w-full h-full flex items-center justify-center"
-        style={{ background: "linear-gradient(135deg, #1a4020, #0a1a0c)" }}>
-        <div className="mmo-panel p-8 max-w-md text-center">
-          <div className="mmo-title text-2xl mb-3" style={{ color: "#c9a227" }}>ETERNAL KINGDOMS</div>
-          <div className="mmo-text text-sm opacity-60">WebGL required — open in a WebGL-capable browser.</div>
-        </div>
+  if (webglError) return (
+    <div className="w-full h-full flex items-center justify-center bg-[#0a1a0c]">
+      <div className="mmo-panel p-8 max-w-md text-center">
+        <div className="mmo-title text-2xl mb-3" style={{color:"#c9a227"}}>ETERNAL KINGDOMS</div>
+        <div className="mmo-text text-sm opacity-60">WebGL required — open in a WebGL-capable browser.</div>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
-    <canvas
-      id="babylon-canvas"
-      ref={canvasRef}
+    <canvas ref={canvasRef} id="babylon-canvas"
       className="w-full h-full block"
-      style={{ touchAction: "none", outline: "none", cursor: "grab" }}
+      style={{touchAction:"none",outline:"none",cursor:"grab"}}
       data-testid="babylon-canvas"
     />
   );
