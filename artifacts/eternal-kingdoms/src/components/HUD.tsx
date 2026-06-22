@@ -1,5 +1,5 @@
 import { useRef, useEffect } from "react";
-import { Compass, Castle, Map } from "lucide-react";
+import { Compass, Castle, Map, Shield, Swords, Crown } from "lucide-react";
 
 interface HUDProps {
   coords: { x: number; z: number };
@@ -112,89 +112,137 @@ export function HUD({ coords, selected }: HUDProps) {
     }
   }, [coords]);
 
+  const xCoord = Math.round(coords.x);
+  const yCoord = Math.round(coords.z);
+
   return (
     <>
       {/* ── Top Left: Player panel ── */}
-      <div className="mmo-panel absolute top-3 left-3 w-52" data-testid="panel-player">
-        <div className="mmo-panel-header flex items-center gap-2">
-          <Compass size={12} className="text-amber-400" />
-          <span className="mmo-title text-xs">DRAGONLORD AETHARION</span>
+      <div className="mmo-panel absolute top-4 left-4 w-72" data-testid="panel-player">
+        <div className="mmo-panel-header flex items-center justify-center gap-2">
+          <Crown size={14} className="text-amber-400" />
+          <span className="mmo-title text-sm tracking-wider">DRAGONLORD AETHARION</span>
+          <Crown size={14} className="text-amber-400" />
         </div>
-        <div className="px-3 py-2 space-y-1">
-          <div className="flex justify-between items-center">
-            <span className="mmo-text text-xs opacity-70">Kingdom</span>
-            <span className="mmo-title text-xs" style={{ color: "#c9a227" }}>Ironveil Keep</span>
+        
+        <div className="p-4 space-y-3">
+          {/* Main Stats Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-black/40 border border-amber-900/40 p-2 rounded-sm text-center">
+              <div className="mmo-text text-[0.65rem] uppercase tracking-wider opacity-70 mb-1 flex items-center justify-center gap-1">
+                <Castle size={10} /> Kingdom
+              </div>
+              <div className="mmo-value-gold text-sm truncate">Ironveil Keep</div>
+            </div>
+            
+            <div className="bg-black/40 border border-amber-900/40 p-2 rounded-sm text-center">
+              <div className="mmo-text text-[0.65rem] uppercase tracking-wider opacity-70 mb-1 flex items-center justify-center gap-1">
+                <Swords size={10} /> Power
+              </div>
+              <div className="mmo-value text-sm text-emerald-300">1,284,600</div>
+            </div>
+            
+            <div className="bg-black/40 border border-amber-900/40 p-2 rounded-sm text-center col-span-2">
+              <div className="mmo-text text-[0.65rem] uppercase tracking-wider opacity-70 mb-1 flex items-center justify-center gap-1">
+                <Shield size={10} /> Alliance
+              </div>
+              <div className="mmo-value text-sm text-sky-300">[NOVA]</div>
+            </div>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="mmo-text text-xs opacity-70">Power</span>
-            <span className="mmo-text text-xs text-emerald-400">1,284,600</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="mmo-text text-xs opacity-70">Alliance</span>
-            <span className="mmo-text text-xs text-sky-400">[NOVA]</span>
-          </div>
-          <div className="border-t border-amber-900/30 pt-1 mt-1 flex items-center gap-2">
-            <Map size={10} className="text-amber-600" />
-            <span className="coord-text" data-testid="coord-display">
-              {coords.x >= 0 ? "E" : "W"}{Math.abs(Math.round(coords.x))} :{" "}
-              {coords.z >= 0 ? "N" : "S"}{Math.abs(Math.round(coords.z))}
-            </span>
+
+          {/* Coordinate Display */}
+          <div className="pt-2 flex justify-center">
+            <div className="coord-display-container" data-testid="coord-display">
+              <Map size={14} className="text-amber-500/80" />
+              <span className="coord-text">
+                C:2 &nbsp;&nbsp;X:{xCoord} &nbsp;&nbsp;Y:{yCoord}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── Bottom Left: Selected Kingdom ── */}
       <div
-        className="mmo-panel absolute bottom-3 left-3 w-56 selected-pulse"
+        className="mmo-panel absolute bottom-4 left-4 w-72 selected-pulse"
         data-testid="panel-selected"
       >
-        <div className="mmo-panel-header flex items-center gap-2">
-          <Castle size={12} className="text-amber-400" />
-          <span className="mmo-title text-xs">
-            {selected ? "SELECTED" : "KINGDOM INFO"}
+        <div className="mmo-panel-header flex items-center justify-center gap-2">
+          <span className="mmo-title text-sm">
+            {selected ? "KINGDOM DETAILS" : "SELECTION"}
           </span>
         </div>
+        
         {selected ? (
-          <div className="px-3 py-2 space-y-1">
-            <div className="mmo-title text-sm" style={{ color: "#e8c547" }}>{selected.name}</div>
-            <div className="flex justify-between">
-              <span className="mmo-text text-xs opacity-60">Type</span>
-              <span className="mmo-text text-xs">{selected.type}</span>
+          <div className="p-4 space-y-3">
+            <div className="text-center mb-4">
+              <div className="mmo-title text-lg mb-1">{selected.name}</div>
+              <div className="h-px w-24 bg-gradient-to-r from-transparent via-amber-500/50 to-transparent mx-auto"></div>
             </div>
-            <div className="flex justify-between">
-              <span className="mmo-text text-xs opacity-60">Level</span>
-              <span className="mmo-text text-xs text-amber-400">Lv.{selected.level}</span>
+            
+            <div className="bg-black/30 border border-amber-900/30 p-3 rounded-sm space-y-2">
+              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                <span className="mmo-text text-xs uppercase tracking-wide opacity-80">Type</span>
+                <span className="mmo-value text-sm">{selected.type}</span>
+              </div>
+              <div className="flex justify-between items-center pt-1">
+                <span className="mmo-text text-xs uppercase tracking-wide opacity-80">Level</span>
+                <span className="mmo-value-gold text-sm flex items-center gap-1">
+                  <span className="text-xs opacity-70">Lv.</span>{selected.level}
+                </span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <button className="mmo-btn text-center py-2">SCOUT</button>
+              <button className="mmo-btn text-center py-2">MARCH</button>
             </div>
           </div>
         ) : (
-          <div className="px-3 py-2 space-y-1">
-            <div className="mmo-text text-xs opacity-50 italic">Click a kingdom to inspect</div>
-            <div className="flex items-center gap-1 mt-2">
-              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="mmo-text text-xs opacity-60">21 kingdoms on map</span>
+          <div className="p-6 text-center space-y-4">
+            <Compass size={32} className="mx-auto text-amber-500/30 animate-pulse" />
+            <div>
+              <div className="mmo-value-gold text-sm mb-1">AWAITING ORDERS</div>
+              <div className="mmo-text text-xs opacity-70 leading-relaxed">
+                Select a kingdom on the map to view detailed intelligence and tactical options.
+              </div>
             </div>
-            <div className="mmo-text text-xs opacity-40">Drag to explore · Auto-scroll edges</div>
+            <div className="inline-flex items-center gap-2 bg-black/40 px-3 py-1.5 border border-amber-900/30 rounded-sm">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+              <span className="mmo-text text-[0.65rem] uppercase tracking-wider opacity-80">Map Active</span>
+            </div>
           </div>
         )}
       </div>
 
       {/* ── Bottom Right: Minimap ── */}
-      <div className="mmo-panel absolute bottom-3 right-3 p-2" data-testid="panel-minimap">
-        <div className="mmo-panel-header flex items-center justify-between gap-2 mb-2 -mx-2 -mt-2 px-2 pt-2">
-          <span className="mmo-title" style={{ fontSize: "0.6rem" }}>WORLD MAP</span>
-          <span className="mmo-text" style={{ fontSize: "0.55rem", opacity: 0.5 }}>ETERNAL KINGDOMS</span>
+      <div className="mmo-panel absolute bottom-4 right-4 p-3 flex flex-col items-center" data-testid="panel-minimap">
+        <div className="mmo-title text-xs mb-2 tracking-[0.2em] flex items-center gap-2 w-full justify-center opacity-90 border-b border-amber-900/30 pb-2">
+          <span className="w-8 h-px bg-gradient-to-r from-transparent to-amber-500/50"></span>
+          WORLD MAP
+          <span className="w-8 h-px bg-gradient-to-l from-transparent to-amber-500/50"></span>
         </div>
-        <canvas
-          ref={minimapRef}
-          width={148}
-          height={148}
-          className="minimap-canvas block"
-          data-testid="minimap-canvas"
-        />
-        <div className="flex justify-between mt-1 px-1">
-          <span className="mmo-text" style={{ fontSize: "0.5rem", opacity: 0.4 }}>W</span>
-          <span className="mmo-text" style={{ fontSize: "0.5rem", opacity: 0.4 }}>C:2  X:{Math.round(coords.x)}  Y:{Math.round(coords.z)}</span>
-          <span className="mmo-text" style={{ fontSize: "0.5rem", opacity: 0.4 }}>E</span>
+        
+        <div className="minimap-container">
+          <canvas
+            ref={minimapRef}
+            width={148}
+            height={148}
+            className="minimap-canvas block"
+            data-testid="minimap-canvas"
+          />
+        </div>
+        
+        <div className="w-full flex justify-between items-center mt-3 px-1">
+          <div className="mmo-text text-[0.6rem] opacity-60 uppercase tracking-widest flex flex-col items-center">
+            <span>ETERNAL</span>
+            <span>KINGDOMS</span>
+          </div>
+          <div className="bg-black/50 border border-amber-900/50 px-2 py-1">
+            <span className="mmo-text text-[0.65rem] opacity-90 font-mono tracking-wider">
+              {xCoord},{yCoord}
+            </span>
+          </div>
         </div>
       </div>
     </>

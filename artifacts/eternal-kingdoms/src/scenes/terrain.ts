@@ -8,50 +8,32 @@ import {
   Mesh,
 } from "@babylonjs/core";
 
-// Simple smooth noise
+// ── Noise helpers ───────────────────────────────────────────────────────────
 function hash(x: number, y: number): number {
   const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
   return n - Math.floor(n);
 }
-
 function smoothNoise(x: number, y: number): number {
-  const ix = Math.floor(x);
-  const iy = Math.floor(y);
-  const fx = x - ix;
-  const fy = y - iy;
-  const ux = fx * fx * (3 - 2 * fx);
-  const uy = fy * fy * (3 - 2 * fy);
-  const a = hash(ix, iy);
-  const b = hash(ix + 1, iy);
-  const c = hash(ix, iy + 1);
-  const d = hash(ix + 1, iy + 1);
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = x - ix, fy = y - iy;
+  const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const a = hash(ix, iy), b = hash(ix + 1, iy);
+  const c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
   return a + (b - a) * ux + (c - a) * uy + (d - b) * ux * uy - (c - a) * ux * uy;
 }
-
-function fbm(x: number, y: number, octaves = 4): number {
-  let v = 0, amp = 0.5, freq = 1, max = 0;
-  for (let i = 0; i < octaves; i++) {
-    v += smoothNoise(x * freq, y * freq) * amp;
-    max += amp;
-    amp *= 0.5;
-    freq *= 2.1;
+function fbm(x: number, y: number, oct = 5): number {
+  let v = 0, a = 0.5, f = 1, m = 0;
+  for (let i = 0; i < oct; i++) {
+    v += smoothNoise(x * f, y * f) * a;
+    m += a; a *= 0.5; f *= 2.1;
   }
-  return v / max;
+  return v / m;
 }
-
-const TEX_SIZE = 1024;
-
-// LOK terrain color palette
-const PALETTE = {
-  grass_bright: [88, 167, 50],    // bright lime green (main)
-  grass_mid: [68, 138, 42],       // medium green
-  grass_dark: [48, 105, 30],      // darker green (forest shade)
-  dirt: [180, 140, 82],           // sandy dirt path
-  dirt_dark: [148, 110, 58],      // darker dirt
-  forest: [38, 85, 22],           // deep forest
-};
-
-function lerpColor(a: number[], b: number[], t: number): [number, number, number] {
+function ss(e0: number, e1: number, x: number) {
+  const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
+}
+function lerp3(a: number[], b: number[], t: number): [number,number,number] {
   return [
     Math.round(a[0] + (b[0] - a[0]) * t),
     Math.round(a[1] + (b[1] - a[1]) * t),
@@ -59,117 +41,119 @@ function lerpColor(a: number[], b: number[], t: number): [number, number, number
   ];
 }
 
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
+// ── LOK accurate palette ─────────────────────────────────────────────────────
+// These match the actual LOK screenshot pixel colours:
+const C = {
+  grassA:  [112, 195,  62],   // Bright lime-green (LOK main grass)
+  grassB:  [ 88, 168,  46],   // Medium green
+  grassC:  [ 64, 135,  32],   // Darker green patches
+  grassD:  [ 48, 108,  22],   // Shadowed green under trees
+  dirtA:   [200, 165, 100],   // Bright sandy dirt path
+  dirtB:   [168, 132,  72],   // Shaded dirt
+  forest:  [ 34,  88,  16],   // Dense forest dark
+  water:   [ 68, 148, 210],   // Lake/river
+};
+
+const TEX = 2048;
 
 export function createTerrain(scene: Scene): Mesh {
-  const WORLD_SIZE = 500;
-  const SUBDIVISIONS = 4; // Flat terrain - no need for many subdivisions
+  const WORLD = 500;
 
-  const ground = MeshBuilder.CreateGround(
-    "terrain",
-    { width: WORLD_SIZE, height: WORLD_SIZE, subdivisions: SUBDIVISIONS },
-    scene,
-  );
+  const ground = MeshBuilder.CreateGround("terrain", { width: WORLD, height: WORLD, subdivisions: 2 }, scene);
   ground.position.y = 0;
 
-  // Build the painted texture
-  const tex = new DynamicTexture("terrainTex", { width: TEX_SIZE, height: TEX_SIZE }, scene, false);
+  const tex = new DynamicTexture("terrainTex", { width: TEX, height: TEX }, scene, false);
   const ctx = tex.getContext() as CanvasRenderingContext2D;
+  const img = ctx.createImageData(TEX, TEX);
+  const d = img.data;
 
-  const imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-  const data = imgData.data;
+  for (let py = 0; py < TEX; py++) {
+    for (let px = 0; px < TEX; px++) {
+      const nx = px / TEX;
+      const ny = py / TEX;
 
-  for (let py = 0; py < TEX_SIZE; py++) {
-    for (let px = 0; px < TEX_SIZE; px++) {
-      const nx = px / TEX_SIZE;
-      const ny = py / TEX_SIZE;
+      // ── Large organic colour zones ──────────────────────────────────────────
+      const zone   = fbm(nx * 2.2 + 0.3, ny * 2.2 + 0.7, 5);
+      const detail = fbm(nx * 6   + 1.1, ny * 6   + 0.9, 4);
+      const micro  = fbm(nx * 20  + 3.3, ny * 20  + 2.1, 3);
 
-      // Large color zones
-      const zone = fbm(nx * 2.5 + 0.3, ny * 2.5 + 0.7, 4);
-      const detail = fbm(nx * 7, ny * 7, 3);
-      const micro = fbm(nx * 18, ny * 18, 2);
+      // ── Winding organic dirt trails ─────────────────────────────────────────
+      // Two separate trail networks blended together
+      const d1 = fbm(nx * 2.8 + 0.7, ny * 2.8 + 2.1, 5);
+      const d2 = fbm(nx * 3.4 + 4.5, ny * 3.4 + 1.3, 4);
+      const dirtRidge = Math.min(Math.abs(d1 - 0.44), Math.abs(d2 - 0.51));
+      const dirtFactor = ss(0.055, 0.0, dirtRidge);
 
-      // Dirt path winding (noise-based "rivers" of dirt)
-      const dirtNoise = fbm(nx * 3 + 1.7, ny * 3 + 0.9, 4);
-      const dirtRidge = Math.abs(dirtNoise - 0.45);
-      const dirtFactor = smoothstep(0.06, 0.0, dirtRidge);
+      // ── Forest density patches ──────────────────────────────────────────────
+      const fNoise  = fbm(nx * 2.4 + 5.1, ny * 2.4 + 3.3, 4);
+      const fFactor = ss(0.55, 0.70, fNoise);
 
-      // Forest patches
-      const forestNoise = fbm(nx * 2.8 + 5.1, ny * 2.8 + 3.3, 3);
-      const forestFactor = smoothstep(0.52, 0.65, forestNoise);
-
-      let r: number, g: number, b: number;
-      let color: [number, number, number];
-
-      // Base grass
-      if (zone < 0.35) {
-        color = lerpColor(PALETTE.grass_dark, PALETTE.grass_mid, detail);
-      } else if (zone < 0.65) {
-        color = lerpColor(PALETTE.grass_mid, PALETTE.grass_bright, detail);
+      // ── Base grass colour ───────────────────────────────────────────────────
+      let color: [number,number,number];
+      if (zone < 0.28) {
+        color = lerp3(C.grassC, C.grassB, detail);
+      } else if (zone < 0.52) {
+        color = lerp3(C.grassB, C.grassA, detail);
+      } else if (zone < 0.72) {
+        color = lerp3(C.grassA, C.grassB, detail * 0.7);
       } else {
-        color = lerpColor(PALETTE.grass_bright, PALETTE.grass_mid, detail * 0.5);
+        color = lerp3(C.grassB, C.grassC, detail * 0.5);
       }
 
-      // Apply forest patches
-      if (forestFactor > 0.01) {
-        color = lerpColor(color, PALETTE.forest, forestFactor * 0.6);
+      // ── Forest shadow underneath tree clusters ──────────────────────────────
+      if (fFactor > 0.01) {
+        color = lerp3(color, C.forest, fFactor * 0.55);
       }
 
-      // Apply micro-texture variation
+      // ── Micro colour variation (hand-painted texture feel) ──────────────────
       color = [
-        Math.max(0, Math.min(255, color[0] + Math.round((micro - 0.5) * 14))),
-        Math.max(0, Math.min(255, color[1] + Math.round((micro - 0.5) * 18))),
-        Math.max(0, Math.min(255, color[2] + Math.round((micro - 0.5) * 8))),
+        Math.max(0, Math.min(255, color[0] + Math.round((micro - 0.5) * 18))),
+        Math.max(0, Math.min(255, color[1] + Math.round((micro - 0.5) * 22))),
+        Math.max(0, Math.min(255, color[2] + Math.round((micro - 0.5) * 10))),
       ];
 
-      // Apply dirt paths on top
-      if (dirtFactor > 0.05) {
-        const dirtColor = lerpColor(PALETTE.dirt_dark, PALETTE.dirt, detail);
-        color = lerpColor(color, dirtColor, Math.min(1, dirtFactor * 2.5));
+      // ── Dirt trails overwrite grass ─────────────────────────────────────────
+      if (dirtFactor > 0.02) {
+        const dc = lerp3(C.dirtB, C.dirtA, detail);
+        color = lerp3(color, dc, Math.min(1, dirtFactor * 2.8));
       }
 
-      [r, g, b] = color;
-      const idx = (py * TEX_SIZE + px) * 4;
-      data[idx] = r;
-      data[idx + 1] = g;
-      data[idx + 2] = b;
-      data[idx + 3] = 255;
+      const idx = (py * TEX + px) * 4;
+      d[idx]     = color[0];
+      d[idx + 1] = color[1];
+      d[idx + 2] = color[2];
+      d[idx + 3] = 255;
     }
   }
 
-  ctx.putImageData(imgData, 0, 0);
+  ctx.putImageData(img, 0, 0);
   tex.update();
 
   const mat = new StandardMaterial("terrainMat", scene);
   mat.diffuseTexture = tex;
-  mat.specularColor = new Color3(0.02, 0.02, 0.02);
-  mat.ambientColor = new Color3(0.5, 0.5, 0.5);
-
+  mat.specularColor = new Color3(0.0, 0.0, 0.0);   // No specular — flat painted look
+  mat.ambientColor  = new Color3(0.85, 0.85, 0.85); // Bright ambient — LOK is very bright
   ground.material = mat;
-  ground.receiveShadows = true;
+  ground.receiveShadows = false; // Flat lit — no ground shadows
 
-  // Water patches
-  const waterPatches = [
-    { x: -90, z: 55, w: 28, h: 18 },
-    { x: 95, z: -65, w: 24, h: 16 },
-    { x: -110, z: -75, w: 20, h: 14 },
-    { x: 65, z: 110, w: 22, h: 14 },
-    { x: -45, z: 125, w: 16, h: 12 },
-    { x: 125, z: 45, w: 18, h: 12 },
+  // ── Water bodies ────────────────────────────────────────────────────────────
+  const waters = [
+    { x: -88, z:  52, w: 30, h: 20 },
+    { x:  92, z: -68, w: 26, h: 18 },
+    { x:-108, z: -72, w: 22, h: 16 },
+    { x:  62, z: 112, w: 24, h: 16 },
+    { x: -42, z: 128, w: 18, h: 14 },
+    { x: 128, z:  42, w: 20, h: 14 },
   ];
-
-  waterPatches.forEach(({ x, z, w, h }, i) => {
-    const water = MeshBuilder.CreateGround(`water_${i}`, { width: w, height: h, subdivisions: 2 }, scene);
-    water.position = new Vector3(x, 0.05, z);
+  waters.forEach(({ x, z, w, h }, i) => {
+    const wg = MeshBuilder.CreateGround(`water_${i}`, { width: w, height: h, subdivisions: 2 }, scene);
+    wg.position = new Vector3(x, 0.06, z);
     const wm = new StandardMaterial(`waterMat_${i}`, scene);
-    wm.diffuseColor = new Color3(0.25, 0.52, 0.72);
-    wm.specularColor = new Color3(0.4, 0.55, 0.75);
-    wm.specularPower = 80;
-    wm.alpha = 0.82;
-    water.material = wm;
+    wm.diffuseColor  = new Color3(0.26, 0.58, 0.82);
+    wm.specularColor = new Color3(0.5, 0.65, 0.9);
+    wm.specularPower = 120;
+    wm.alpha = 0.80;
+    wg.material = wm;
   });
 
   return ground;

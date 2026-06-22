@@ -19,29 +19,28 @@ function seededRand(seed: number) {
 
 function isNearKingdom(x: number, z: number, kingdoms: Array<{ x: number; z: number }>): boolean {
   for (const k of kingdoms) {
-    const dx = x - k.x;
-    const dz = z - k.z;
-    if (dx * dx + dz * dz < 14 * 14) return true;
+    const dx = x - k.x, dz = z - k.z;
+    if (dx * dx + dz * dz < 13 * 13) return true;
   }
   return false;
 }
 
 function isNearWater(x: number, z: number): boolean {
   const patches = [
-    { x: -90, z: 55, w: 28, h: 18 },
-    { x: 95, z: -65, w: 24, h: 16 },
-    { x: -110, z: -75, w: 20, h: 14 },
-    { x: 65, z: 110, w: 22, h: 14 },
-    { x: -45, z: 125, w: 16, h: 12 },
-    { x: 125, z: 45, w: 18, h: 12 },
+    { x: -88, z:  52, w: 30, h: 20 },
+    { x:  92, z: -68, w: 26, h: 18 },
+    { x:-108, z: -72, w: 22, h: 16 },
+    { x:  62, z: 112, w: 24, h: 16 },
+    { x: -42, z: 128, w: 18, h: 14 },
+    { x: 128, z:  42, w: 20, h: 14 },
   ];
   for (const p of patches) {
-    if (Math.abs(x - p.x) < p.w / 2 + 6 && Math.abs(z - p.z) < p.h / 2 + 6) return true;
+    if (Math.abs(x - p.x) < p.w / 2 + 5 && Math.abs(z - p.z) < p.h / 2 + 5) return true;
   }
   return false;
 }
 
-function makeMatrix(x: number, y: number, z: number, sx: number, sy: number, sz: number, ry = 0): Float32Array {
+function mat4(x: number, y: number, z: number, sx: number, sy: number, sz: number, ry = 0): Float32Array {
   return new Float32Array(
     Matrix.Compose(
       new Vector3(sx, sy, sz),
@@ -51,8 +50,8 @@ function makeMatrix(x: number, y: number, z: number, sx: number, sy: number, sz:
   );
 }
 
-function applyThinInstances(mesh: Mesh, mats: Float32Array[]) {
-  if (mats.length === 0) { mesh.isVisible = false; return; }
+function applyThin(mesh: Mesh, mats: Float32Array[]) {
+  if (!mats.length) { mesh.isVisible = false; return; }
   const buf = new Float32Array(mats.length * 16);
   mats.forEach((m, i) => buf.set(m, i * 16));
   mesh.isVisible = true;
@@ -62,105 +61,101 @@ function applyThinInstances(mesh: Mesh, mats: Float32Array[]) {
 export function createDecorations(scene: Scene, kingdoms: Array<{ x: number; z: number }>) {
   const rand = seededRand(42137);
 
-  // LOK-style: dark green compact cone trees
-  const foliageDarkMat = new StandardMaterial("foliageDark", scene);
-  foliageDarkMat.diffuseColor = new Color3(0.12, 0.38, 0.10);
-  foliageDarkMat.specularColor = new Color3(0.01, 0.02, 0.01);
+  // ── LOK tree look: dark green, wide flat cone viewed from above ──────────────
+  // Bottom tier — very wide, very short cone (looks like a round blob from top)
+  const treeMat = new StandardMaterial("treeMat", scene);
+  treeMat.diffuseColor = new Color3(0.13, 0.38, 0.08);
+  treeMat.specularColor = Color3.Black();
+  treeMat.ambientColor = new Color3(0.3, 0.5, 0.2);
 
-  const foliageMidMat = new StandardMaterial("foliageMid", scene);
-  foliageMidMat.diffuseColor = new Color3(0.18, 0.48, 0.14);
-  foliageMidMat.specularColor = new Color3(0.01, 0.02, 0.01);
+  const treeMat2 = new StandardMaterial("treeMat2", scene);
+  treeMat2.diffuseColor = new Color3(0.18, 0.46, 0.10);
+  treeMat2.specularColor = Color3.Black();
+  treeMat2.ambientColor = new Color3(0.3, 0.5, 0.2);
+
+  // LOK trees look like round dark-green blobs from above
+  // Use very wide, short cones (wide = high width-to-height ratio)
+  const cone1 = MeshBuilder.CreateCylinder("treeCone1", {
+    height: 1.6, diameterTop: 0, diameterBottom: 3.8, tessellation: 9,
+  }, scene);
+  cone1.material = treeMat;
+  cone1.isVisible = false;
+
+  const cone2 = MeshBuilder.CreateCylinder("treeCone2", {
+    height: 1.2, diameterTop: 0, diameterBottom: 2.8, tessellation: 9,
+  }, scene);
+  cone2.material = treeMat2;
+  cone2.isVisible = false;
 
   const rockMat = new StandardMaterial("rockMat", scene);
-  rockMat.diffuseColor = new Color3(0.52, 0.49, 0.44);
+  rockMat.diffuseColor = new Color3(0.50, 0.46, 0.40);
   rockMat.specularColor = new Color3(0.04, 0.04, 0.04);
-
-  // Base cone mesh for trees (LOK-style compact)
-  const cone = MeshBuilder.CreateCylinder("treeCone", {
-    height: 2.2,
-    diameterTop: 0,
-    diameterBottom: 2.4,
-    tessellation: 7,
-  }, scene);
-  cone.material = foliageDarkMat;
-  cone.isVisible = false;
-
-  const coneMid = MeshBuilder.CreateCylinder("treeConeM", {
-    height: 1.6,
-    diameterTop: 0,
-    diameterBottom: 1.8,
-    tessellation: 7,
-  }, scene);
-  coneMid.material = foliageMidMat;
-  coneMid.isVisible = false;
+  rockMat.ambientColor = new Color3(0.4, 0.4, 0.4);
 
   const rock = MeshBuilder.CreateSphere("rock", { diameter: 1, segments: 5 }, scene);
   rock.material = rockMat;
   rock.isVisible = false;
 
-  const coneArr: Float32Array[] = [];
-  const coneMArr: Float32Array[] = [];
+  const c1: Float32Array[] = [];
+  const c2: Float32Array[] = [];
 
-  // Place tree CLUSTERS like LOK — groups of 2-5 trees close together
-  const CLUSTER_COUNT = 180;
-  for (let c = 0; c < CLUSTER_COUNT; c++) {
+  // Place dense clusters (LOK has many dense tree groups)
+  for (let cluster = 0; cluster < 220; cluster++) {
     const cx = (rand() - 0.5) * 460;
     const cz = (rand() - 0.5) * 460;
     if (isNearKingdom(cx, cz, kingdoms) || isNearWater(cx, cz)) continue;
 
-    const clusterSize = 2 + Math.floor(rand() * 4);
-    for (let t = 0; t < clusterSize; t++) {
-      const ox = cx + (rand() - 0.5) * 6;
-      const oz = cz + (rand() - 0.5) * 6;
-      const s = 0.6 + rand() * 0.55;
+    const count = 2 + Math.floor(rand() * 5);
+    for (let t = 0; t < count; t++) {
+      const ox = cx + (rand() - 0.5) * 7;
+      const oz = cz + (rand() - 0.5) * 7;
+      const s = 0.55 + rand() * 0.65;
       const ry = rand() * Math.PI * 2;
-
-      // Bottom cone
-      coneArr.push(makeMatrix(ox, 1.1 * s, oz, s, s, s, ry));
-      // Top cone (slightly smaller, shifted up)
-      coneMArr.push(makeMatrix(ox, 2.2 * s, oz, s * 0.75, s * 0.75, s * 0.75, ry));
+      c1.push(mat4(ox, 0.8 * s, oz, s, s, s, ry));
+      c2.push(mat4(ox, 1.6 * s, oz, s * 0.72, s * 0.72, s * 0.72, ry + 0.5));
     }
   }
 
-  applyThinInstances(cone, coneArr);
-  applyThinInstances(coneMid, coneMArr);
+  applyThin(cone1, c1);
+  applyThin(cone2, c2);
 
-  // Rocks
-  const rockArr: Float32Array[] = [];
-  for (let i = 0; i < 200; i++) {
+  // Rocks — small flat clusters (visible from top as grey blobs)
+  const rr: Float32Array[] = [];
+  for (let i = 0; i < 250; i++) {
     const x = (rand() - 0.5) * 460;
     const z = (rand() - 0.5) * 460;
     if (isNearKingdom(x, z, kingdoms) || isNearWater(x, z)) continue;
-    const sx = 0.6 + rand() * 1.8;
-    const sy = 0.35 + rand() * 0.65;
-    const sz = 0.6 + rand() * 1.8;
-    rockArr.push(makeMatrix(x, sy * 0.5, z, sx, sy, sz));
+    const sx = 0.7 + rand() * 1.8;
+    const sy = 0.25 + rand() * 0.55;
+    const sz = 0.7 + rand() * 1.8;
+    rr.push(mat4(x, sy * 0.5, z, sx, sy, sz));
   }
-  applyThinInstances(rock, rockArr);
+  applyThin(rock, rr);
 
-  // Ruined stone blocks
+  // ── Ruins / ancient stone blocks ─────────────────────────────────────────────
   const ruinMat = new StandardMaterial("ruinMat", scene);
-  ruinMat.diffuseColor = new Color3(0.50, 0.46, 0.40);
-  ruinMat.specularColor = new Color3(0.04, 0.04, 0.04);
+  ruinMat.diffuseColor = new Color3(0.52, 0.48, 0.42);
+  ruinMat.specularColor = Color3.Black();
+  ruinMat.ambientColor = new Color3(0.5, 0.5, 0.5);
 
-  const ruinBox = MeshBuilder.CreateBox("ruinBox", { width: 1, height: 1, depth: 1 }, scene);
+  const ruinBox = MeshBuilder.CreateBox("ruinBox", { size: 1 }, scene);
   ruinBox.material = ruinMat;
   ruinBox.isVisible = false;
 
-  const ruinArr: Float32Array[] = [];
-  for (let r = 0; r < 10; r++) {
+  const rb: Float32Array[] = [];
+  for (let r = 0; r < 14; r++) {
     const cx = (rand() - 0.5) * 400;
     const cz = (rand() - 0.5) * 400;
     if (isNearKingdom(cx, cz, kingdoms) || isNearWater(cx, cz)) continue;
-    const blocks = 2 + Math.floor(rand() * 4);
-    for (let b = 0; b < blocks; b++) {
-      const ox = cx + (rand() - 0.5) * 8;
-      const oz = cz + (rand() - 0.5) * 8;
-      const w = 0.7 + rand() * 1.2;
-      const h = 0.4 + rand() * 1.4;
-      const d = 0.7 + rand() * 1.2;
-      ruinArr.push(makeMatrix(ox, h / 2, oz, w, h, d, rand() * Math.PI * 2));
+    const n = 3 + Math.floor(rand() * 4);
+    for (let b = 0; b < n; b++) {
+      const ox = cx + (rand() - 0.5) * 9;
+      const oz = cz + (rand() - 0.5) * 9;
+      const w = 0.8 + rand() * 1.2;
+      const h = 0.3 + rand() * 1.2;
+      const dep = 0.8 + rand() * 1.2;
+      rb.push(mat4(ox, h * 0.5, oz, w, h, dep, rand() * Math.PI));
     }
   }
-  applyThinInstances(ruinBox, ruinArr);
+  applyThin(ruinBox, rb);
 }
