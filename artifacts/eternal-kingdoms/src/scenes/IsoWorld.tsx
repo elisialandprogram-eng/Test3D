@@ -59,6 +59,56 @@ function buildEntityMap(): EntityMap {
   return m;
 }
 
+// ─── Plant sprites ────────────────────────────────────────────────────────────
+interface PlantSprite { file: string; scale: number; }
+
+const FOREST_PLANTS: PlantSprite[] = [
+  { file: "bigtree01.png",  scale: 1.9 },
+  { file: "bigtree02.png",  scale: 1.9 },
+  { file: "bigtree03.png",  scale: 1.9 },
+  { file: "pine-full01.png", scale: 1.7 },
+  { file: "pine-full02.png", scale: 1.7 },
+  { file: "pine-full03.png", scale: 1.7 },
+  { file: "pine-full04.png", scale: 1.7 },
+  { file: "pine-full05.png", scale: 1.7 },
+  { file: "pine-full06.png", scale: 1.7 },
+  { file: "bamboo01.png",   scale: 1.5 },
+  { file: "bamboo02.png",   scale: 1.5 },
+  { file: "bamboo03.png",   scale: 1.5 },
+  { file: "bamboo04.png",   scale: 1.5 },
+  { file: "tropical01.png", scale: 1.6 },
+  { file: "tropical02.png", scale: 1.6 },
+  { file: "tropical03.png", scale: 1.6 },
+];
+
+const PLAIN_PLANTS: PlantSprite[] = [
+  { file: "bush01.png",     scale: 1.1 },
+  { file: "bush02.png",     scale: 1.1 },
+  { file: "bush03.png",     scale: 1.1 },
+  { file: "bush04.png",     scale: 1.1 },
+  { file: "shrub1-01.png",  scale: 0.95 },
+  { file: "shrub1-02.png",  scale: 0.95 },
+  { file: "shrub1-03.png",  scale: 0.95 },
+  { file: "shrub2-01.png",  scale: 0.95 },
+  { file: "shrub2-02.png",  scale: 0.95 },
+  { file: "grasses01.png",  scale: 0.85 },
+  { file: "grasses02.png",  scale: 0.85 },
+  { file: "grasses03.png",  scale: 0.85 },
+  { file: "weed01.png",     scale: 0.80 },
+  { file: "weed02.png",     scale: 0.80 },
+  { file: "palm01.png",     scale: 1.4 },
+  { file: "palm02.png",     scale: 1.4 },
+];
+
+const ALL_PLANT_FILES = Array.from(
+  new Set([...FOREST_PLANTS, ...PLAIN_PLANTS].map(p => p.file))
+);
+
+function tileRng(col: number, row: number, offset = 0): number {
+  const n = Math.sin(col * 127.1 + row * 311.7 + offset * 74.3) * 43758.5453;
+  return n - Math.floor(n);
+}
+
 // ─── Tile drawing ─────────────────────────────────────────────────────────────
 function drawTile(
   ctx: CanvasRenderingContext2D,
@@ -183,6 +233,40 @@ function drawSprite(
   ctx.drawImage(img, anchorX - scale / 2, anchorY - aspectH * 0.85, scale, aspectH);
 }
 
+// ─── Plant sprite drawing ─────────────────────────────────────────────────────
+function drawPlantSprite(
+  ctx: CanvasRenderingContext2D,
+  sx: number, sy: number, zoom: number,
+  col: number, row: number,
+  terrain: TerrainType,
+  plantImages: Map<string, HTMLImageElement>,
+) {
+  const pool = terrain === "FOREST" ? FOREST_PLANTS : PLAIN_PLANTS;
+  const density = terrain === "FOREST" ? 0.62 : 0.14;
+
+  if (tileRng(col, row) > density) return;
+
+  const idx = Math.floor(tileRng(col, row, 1) * pool.length);
+  const plant = pool[idx];
+  const img = plantImages.get(plant.file);
+  if (!img || !img.complete || img.naturalWidth === 0) return;
+
+  const w = TILE_W * zoom;
+  const h = TILE_H * zoom;
+
+  const drawW = w * plant.scale;
+  const drawH = (img.naturalHeight / img.naturalWidth) * drawW;
+
+  // Small positional jitter within the tile for natural feel
+  const jx = (tileRng(col, row, 2) - 0.5) * w * 0.35;
+  const jy = (tileRng(col, row, 3) - 0.5) * h * 0.25;
+
+  const anchorX = sx + w / 2 + jx;
+  const anchorY = sy + h / 2 + jy;
+
+  ctx.drawImage(img, anchorX - drawW / 2, anchorY - drawH * 0.88, drawW, drawH);
+}
+
 // ─── Selection highlight ──────────────────────────────────────────────────────
 function drawSelection(
   ctx: CanvasRenderingContext2D,
@@ -227,6 +311,7 @@ export function IsoWorld({ onHover }: IsoWorldProps) {
   // Sprite image cache
   const imagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const entityMapRef = useRef<EntityMap>(buildEntityMap());
+  const plantImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -243,6 +328,7 @@ export function IsoWorld({ onHover }: IsoWorldProps) {
     const { x: camX, y: camY } = camRef.current;
     const images = imagesRef.current;
     const entityMap = entityMapRef.current;
+    const plantImages = plantImagesRef.current;
 
     if (!terrain) { rafRef.current = requestAnimationFrame(render); return; }
 
@@ -257,6 +343,14 @@ export function IsoWorld({ onHover }: IsoWorldProps) {
       const t = terrain[row][col];
       const { x: sx, y: sy } = tileToScreen(col, row, camX, camY, zoom);
       drawTile(ctx, sx, sy, zoom, t);
+    }
+
+    // Pass 2: plant sprites (terrain-aware, seeded placement)
+    for (const [col, row] of tiles) {
+      if (entityMap.has(`${col},${row}`)) continue;
+      const t = terrain[row][col];
+      const { x: sx, y: sy } = tileToScreen(col, row, camX, camY, zoom);
+      drawPlantSprite(ctx, sx, sy, zoom, col, row, t, plantImages);
     }
 
     // Pass 3: entity sprites (sorted back-to-front via renderOrder already)
@@ -311,6 +405,17 @@ export function IsoWorld({ onHover }: IsoWorldProps) {
         img.src = `/sprites/${entity.kind}s/${entity.id}.png`;
         img.onload = () => { needsRender.current = true; };
         images.set(key, img);
+      }
+    }
+
+    // Preload all plant sprites
+    const plantImages = plantImagesRef.current;
+    for (const file of ALL_PLANT_FILES) {
+      if (!plantImages.has(file)) {
+        const img = new Image();
+        img.src = `/sprites/plants/${file}`;
+        img.onload = () => { needsRender.current = true; };
+        plantImages.set(file, img);
       }
     }
 
