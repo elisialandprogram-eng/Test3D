@@ -7,23 +7,29 @@ export const GRID_ROWS = 256;
 export const MAX_ZOOM = 2.5;
 export const INITIAL_ZOOM = 0.65;
 
-// Bounding box of the entire isometric map in iso-space
-export const MAP_ISO_MIN_X = -(GRID_ROWS - 1) * (TILE_W / 2);          // left-most point
-export const MAP_ISO_MAX_X = (GRID_COLS - 1) * (TILE_W / 2) + TILE_W;  // right-most point
+// Bounding box of the entire isometric map in iso-space (used for rendering border)
+export const MAP_ISO_MIN_X = -(GRID_ROWS - 1) * (TILE_W / 2);
+export const MAP_ISO_MAX_X = (GRID_COLS - 1) * (TILE_W / 2) + TILE_W;
 export const MAP_ISO_MIN_Y = 0;
 export const MAP_ISO_MAX_Y = (GRID_COLS + GRID_ROWS - 2) * (TILE_H / 2) + TILE_H + FACE_H;
 
+// Diamond edge constant: K = (COLS-1 + ROWS-1) * (TW/2)
+// The 4 diamond edges each satisfy: 2*isoY ± isoX ∈ [0, 2*K_DIAMOND]
+const K_DIAMOND = (GRID_COLS + GRID_ROWS - 2) * (TILE_W / 2); // 16320 for 256×256
+
 /**
- * Compute the minimum zoom such that the viewport never shows more than
- * 50% of the map in either dimension (~25% of map area at once).
- * Formula: min_zoom = max(2*cw / map_iso_w, 2*ch / map_iso_h)
+ * Minimum zoom so the viewport:
+ *  1. Always fits inside the diamond (no void ever visible)
+ *  2. Sees at most 50% of each map span (~25% total map area)
  */
 export function computeMinZoom(cw: number, ch: number): number {
+  // Constraint 1 (no void): K_DIAMOND * zoom >= cw/2 + ch
+  const noVoid = (cw / 2 + ch) / K_DIAMOND;
+  // Constraint 2 (25% coverage): viewport <= 50% of each map span
   const mapIsoW = MAP_ISO_MAX_X - MAP_ISO_MIN_X;
   const mapIsoH = MAP_ISO_MAX_Y - MAP_ISO_MIN_Y;
-  const byWidth  = (2 * cw) / mapIsoW;
-  const byHeight = (2 * ch) / mapIsoH;
-  return Math.max(byWidth, byHeight, 0.15);
+  const coverage = Math.max((2 * cw) / mapIsoW, (2 * ch) / mapIsoH);
+  return Math.max(noVoid, coverage, 0.1);
 }
 
 export interface ScreenPos { x: number; y: number }
@@ -54,32 +60,40 @@ export function screenToTile(
   return { col, row };
 }
 
-/** Clamp camera so the map bounding box never leaves the screen. */
+/**
+ * Diamond-aware camera clamp — guarantees the dark background is NEVER visible.
+ *
+ * For an iso point (isoX, isoY) to be inside the diamond, 4 conditions must hold:
+ *   2·isoY − isoX ≥ 0          (top-right edge)
+ *   2·isoY + isoX ≥ 0          (top-left edge)
+ *   2·isoY + isoX ≤ 2·K        (bottom-right edge)
+ *   2·isoY − isoX ≤ 2·K        (bottom-left edge)
+ *
+ * Translating each condition for every viewport corner (0,0),(cw,0),(0,ch),(cw,ch)
+ * into constraints on (camX, camY) yields two independent intervals in the
+ * rotated axes P = camX − 2·camY and Q = camX + 2·camY.  Clamping P and Q
+ * independently is both necessary AND sufficient.
+ */
 export function clampCamera(camX: number, camY: number, zoom: number, cw: number, ch: number) {
-  const mapW = (MAP_ISO_MAX_X - MAP_ISO_MIN_X) * zoom;
-  const mapH = (MAP_ISO_MAX_Y - MAP_ISO_MIN_Y) * zoom;
+  const K = K_DIAMOND * zoom;
 
-  let cx: number, cy: number;
+  // Independent bounds in rotated space
+  const P_min = cw;
+  const P_max = 2 * K - 2 * ch;
+  const Q_min = cw + 2 * ch - 2 * K;
+  const Q_max = 0;
 
-  if (mapW >= cw) {
-    // Map wider than viewport: clamp edges
-    const maxCamX = -MAP_ISO_MIN_X * zoom;       // left edge of map at screen left
-    const minCamX = cw - MAP_ISO_MAX_X * zoom;   // right edge of map at screen right
-    cx = Math.max(minCamX, Math.min(maxCamX, camX));
-  } else {
-    // Map narrower than viewport: center it
-    cx = (cw - mapW) / 2 - MAP_ISO_MIN_X * zoom;
+  // Safety: if zoom is below the mathematical minimum, center the camera
+  if (P_max < P_min || Q_max < Q_min) {
+    const P = (P_min + P_max) / 2;
+    const Q = (Q_min + Q_max) / 2;
+    return { x: (P + Q) / 2, y: (Q - P) / 4 };
   }
 
-  if (mapH >= ch) {
-    const maxCamY = -MAP_ISO_MIN_Y * zoom;
-    const minCamY = ch - MAP_ISO_MAX_Y * zoom;
-    cy = Math.max(minCamY, Math.min(maxCamY, camY));
-  } else {
-    cy = (ch - mapH) / 2 - MAP_ISO_MIN_Y * zoom;
-  }
+  const P = Math.max(P_min, Math.min(P_max, camX - 2 * camY));
+  const Q = Math.max(Q_min, Math.min(Q_max, camX + 2 * camY));
 
-  return { x: cx, y: cy };
+  return { x: (P + Q) / 2, y: (Q - P) / 4 };
 }
 
 export function getInitialCamera(cw: number, ch: number, zoom: number) {
