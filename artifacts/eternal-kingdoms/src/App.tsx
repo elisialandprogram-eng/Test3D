@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { WorldMap, type HoverInfo, type WorldMapHandle } from "./scenes/WorldMap";
 import { DebugOverlay } from "./components/DebugOverlay";
+import { ZoomControls } from "./components/ZoomControls";
 import { AdminMapEditor } from "./editor/AdminMapEditor";
 import { useMapEditor } from "./editor/useMapEditor";
 import type { PlacedAsset } from "./editor/types";
@@ -108,6 +109,14 @@ export default function App() {
       {editorOpen && (
         <AdminMapEditor state={patchedState} onClose={() => setEditorOpen(false)} />
       )}
+
+      {/* Zoom controls — bottom-right corner */}
+      <ZoomControls
+        onZoomIn={() => worldMapRef.current?.zoomIn()}
+        onZoomOut={() => worldMapRef.current?.zoomOut()}
+        onWorldView={() => worldMapRef.current?.flyToWorld()}
+        onAreaView={() => worldMapRef.current?.flyToArea()}
+      />
 
       <DebugOverlay hoverInfo={hoverInfo} />
     </div>

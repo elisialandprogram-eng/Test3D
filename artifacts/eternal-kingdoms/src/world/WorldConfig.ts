@@ -5,21 +5,29 @@ export const ZONES_PER_AXIS    = WORLD_SIZE / ZONE_SIZE;   // 64
 export const LANDS_PER_AXIS    = WORLD_SIZE / LAND_SIZE;   // 16
 
 // Rendering
-export const TILE_SCALE        = 4;                         // Babylon units per world coord
-export const SCENE_SIZE        = WORLD_SIZE * TILE_SCALE;   // 8192
+export const TILE_SCALE        = 4;
+export const SCENE_SIZE        = WORLD_SIZE * TILE_SCALE;  // 8192 Babylon units
 
-// Chunk streaming — generate chunks at ANY position (including outside world bounds)
-// so terrain always fills the viewport and edges are never visible.
+// Chunk streaming — unbounded: generates chunks at any position
 export const CHUNK_WORLD_SIZE  = 64;
-export const CHUNK_SCENE_SIZE  = CHUNK_WORLD_SIZE * TILE_SCALE; // 256 Babylon units
+export const CHUNK_SCENE_SIZE  = CHUNK_WORLD_SIZE * TILE_SCALE; // 256
 export const CHUNKS_PER_AXIS   = WORLD_SIZE / CHUNK_WORLD_SIZE; // 32
 export const CHUNK_TEX_SIZE    = 128;
-export const STREAM_RADIUS     = 10;   // chunks loaded around camera
+export const STREAM_RADIUS     = 10;
 export const UNLOAD_RADIUS     = 14;
 
-// Camera — close, top-down, tight zoom range so world edge is never visible
-export const CAM_ALPHA         = -Math.PI / 4;
-export const CAM_BETA          = 0.72;   // ~41° from top (Rise of Kingdoms-style)
-export const CAM_RADIUS_INIT   = 480;    // start close — terrain fills screen
-export const CAM_RADIUS_MIN    = 120;    // very close zoomed-in
-export const CAM_RADIUS_MAX    = 850;    // max zoom-out — still surrounded by terrain
+// Overview map — low-res full-world texture shown at high zoom
+export const OVERVIEW_TEX_SIZE  = 256;   // pixels (256×256 → every 8 world coords)
+export const OVERVIEW_SHOW_AT   = 3000;  // show overview above this cam radius
+export const OVERVIEW_HIDE_AT   = 2000;  // hide overview below this cam radius
+
+// Camera
+// alpha = -PI/2 aligns the camera axis with the world X axis so the
+// world boundary appears as a RECTANGLE on screen (not a diamond).
+export const CAM_ALPHA          = -Math.PI / 2;
+export const CAM_BETA           = 0.82;   // ~47° from top — RoK-style isometric
+export const CAM_RADIUS_INIT    = 650;    // starts zoomed in — terrain fills screen
+export const CAM_RADIUS_MIN     = 80;     // very close (city-level)
+export const CAM_RADIUS_MAX     = 9500;   // far enough to see entire world rectangle
+export const CAM_WORLD_VIEW_R   = 8800;   // "World View" button target radius
+export const CAM_AREA_VIEW_R    = 350;    // "My Area" button target radius

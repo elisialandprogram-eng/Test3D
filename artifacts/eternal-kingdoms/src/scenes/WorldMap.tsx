@@ -4,12 +4,18 @@ import {
 import {
   Engine, Scene, HemisphericLight, DirectionalLight,
   Vector3, Color4, Color3, Mesh, MeshBuilder,
-  StandardMaterial, DynamicTexture, Texture,
+  StandardMaterial, DynamicTexture,
 } from "@babylonjs/core";
-import { createWorldCamera } from "../engine/WorldCamera";
+import { WorldCamera } from "../engine/WorldCamera";
 import { ChunkStreamer } from "../engine/ChunkStreamer";
+import { OverviewMap } from "../engine/OverviewMap";
+import { WorldBorder } from "../engine/WorldBorder";
 import { sceneToWorld, worldToScene, getZoneId, getLandId } from "../world/CoordSystem";
-import { TILE_SCALE, SCENE_SIZE } from "../world/WorldConfig";
+import {
+  TILE_SCALE, SCENE_SIZE,
+  CAM_WORLD_VIEW_R, CAM_AREA_VIEW_R,
+  OVERVIEW_SHOW_AT, OVERVIEW_HIDE_AT,
+} from "../world/WorldConfig";
 import type { PlacedAsset, AssetDef } from "../editor/types";
 
 export interface HoverInfo {
@@ -25,6 +31,10 @@ export interface WorldMapHandle {
   updateAsset(placed: PlacedAsset): void;
   clearAll(): void;
   loadAll(assets: PlacedAsset[], library: Map<string, AssetDef>): void;
+  flyToWorld(): void;
+  flyToArea(): void;
+  zoomIn(): void;
+  zoomOut(): void;
 }
 
 interface WorldMapProps {
@@ -55,13 +65,15 @@ function makeTextureFromDataUrl(
 
 export const WorldMap = forwardRef<WorldMapHandle, WorldMapProps>(
   ({ onHover, editorMode, selectedAssetId, onTerrainClick, onAssetSelect }, ref) => {
-    const canvasRef  = useRef<HTMLCanvasElement>(null);
-    const sceneRef   = useRef<Scene | null>(null);
+    const canvasRef   = useRef<HTMLCanvasElement>(null);
+    const sceneRef    = useRef<Scene | null>(null);
+    const wcamRef     = useRef<WorldCamera | null>(null);
     const streamerRef = useRef<ChunkStreamer | null>(null);
-    const assetMeshes = useRef<Map<string, Mesh>>(new Map());
+    const overviewRef = useRef<OverviewMap | null>(null);
+    const assetMeshes   = useRef<Map<string, Mesh>>(new Map());
     const assetTextures = useRef<Map<string, DynamicTexture>>(new Map());
 
-    // ── Imperative API exposed to AdminMapEditor ───────────────────────────
+    // ── Imperative API ──────────────────────────────────────────────────────
     useImperativeHandle(ref, () => ({
       async placeAsset(placed: PlacedAsset, library: Map<string, AssetDef>) {
         const scene = sceneRef.current;
@@ -71,7 +83,6 @@ export const WorldMap = forwardRef<WorldMapHandle, WorldMapProps>(
 
         const { sx, sz } = worldToScene(placed.x, placed.y);
 
-        // Reuse texture if already loaded for this asset type
         let tex = assetTextures.current.get(placed.assetId);
         if (!tex) {
           tex = await makeTextureFromDataUrl(assetDef.dataUrl, `aTex_${placed.assetId}`, scene);
@@ -127,9 +138,24 @@ export const WorldMap = forwardRef<WorldMapHandle, WorldMapProps>(
         this.clearAll();
         for (const p of assets) this.placeAsset(p, library);
       },
+
+      flyToWorld() {
+        wcamRef.current?.flyTo(1024, 1024, CAM_WORLD_VIEW_R);
+      },
+
+      flyToArea() {
+        const cam = wcamRef.current;
+        if (!cam) return;
+        // zoom into the current target position, don't move XZ
+        const { x: wx, y: wy } = sceneToWorld(cam.cam.target.x, cam.cam.target.z);
+        cam.flyTo(wx, wy, CAM_AREA_VIEW_R);
+      },
+
+      zoomIn()  { wcamRef.current?.zoomBy(-1); },
+      zoomOut() { wcamRef.current?.zoomBy(+1); },
     }));
 
-    // ── Scene setup ────────────────────────────────────────────────────────
+    // ── Scene setup ─────────────────────────────────────────────────────────
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -138,7 +164,7 @@ export const WorldMap = forwardRef<WorldMapHandle, WorldMapProps>(
       const scene  = new Scene(engine);
       sceneRef.current = scene;
 
-      // Sky colour matches grassland so any tiny gaps read as terrain, not void
+      // Sky colour matches terrain so gaps read as terrain, not black void
       scene.clearColor = new Color4(0.36, 0.52, 0.24, 1);
 
       const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
@@ -148,31 +174,41 @@ export const WorldMap = forwardRef<WorldMapHandle, WorldMapProps>(
       const sun = new DirectionalLight("sun", new Vector3(-1, -2, -0.5), scene);
       sun.intensity = 0.5;
 
-      const cam = createWorldCamera(scene, canvas);
+      // World camera (rectangular view, aligned with world axes)
+      const wcam = new WorldCamera(scene, canvas);
+      wcamRef.current = wcam;
 
-      // ── Infinite background plane ──────────────────────────────────────────
-      // A massive flat ground below the terrain chunks acts as an absolute
-      // safety net — if anything slips through the chunk grid the player sees
-      // terrain-coloured ground, never black void.
+      // Infinite background safety plane — absorbs any gap between chunks
       const bgMesh = MeshBuilder.CreateGround(
         "infiniteBackground",
         { width: 200_000, height: 200_000 },
         scene,
       );
-      bgMesh.position = new Vector3(SCENE_SIZE / 2, -0.5, SCENE_SIZE / 2);
+      bgMesh.position = new Vector3(SCENE_SIZE / 2, -1, SCENE_SIZE / 2);
       bgMesh.isPickable = false;
       const bgMat = new StandardMaterial("bgMat", scene);
-      bgMat.diffuseColor  = new Color3(0.36, 0.52, 0.24); // grassland green
+      bgMat.diffuseColor  = new Color3(0.36, 0.52, 0.24);
       bgMat.specularColor = Color3.Black();
       bgMat.ambientColor  = new Color3(1, 1, 1);
       bgMesh.material = bgMat;
 
+      // Full-world overview texture (shown at far zoom)
+      const overview = new OverviewMap(scene);
+      overviewRef.current = overview;
+      overview.setVisible(false);
+
+      // Visible border walls at world edges
+      new WorldBorder(scene);
+
+      // Chunk streamer
       const streamer = new ChunkStreamer(scene);
       streamerRef.current = streamer;
-      streamer.update(cam.target);
+      streamer.update(wcam.cam.target);
 
       engine.runRenderLoop(() => {
-        streamer.update(cam.target);
+        const r = wcam.cam.radius;
+        overview.setVisible(r >= OVERVIEW_SHOW_AT);
+        streamer.update(wcam.cam.target);
         scene.render();
       });
 
@@ -181,14 +217,17 @@ export const WorldMap = forwardRef<WorldMapHandle, WorldMapProps>(
 
       return () => {
         window.removeEventListener("resize", onResize);
+        overview.dispose();
         streamer.dispose();
         scene.dispose();
         engine.dispose();
-        sceneRef.current = null;
+        sceneRef.current  = null;
+        wcamRef.current   = null;
+        overviewRef.current = null;
       };
     }, []);
 
-    // ── Pointer events ─────────────────────────────────────────────────────
+    // ── Pointer events ──────────────────────────────────────────────────────
     const handlePointerMove = useCallback(
       (e: React.PointerEvent<HTMLCanvasElement>) => {
         if (!onHover) return;
