@@ -8,8 +8,7 @@ import {
 } from "@babylonjs/core";
 import { createWorldCamera } from "../engine/WorldCamera";
 import { ChunkStreamer } from "../engine/ChunkStreamer";
-import { sceneToWorld, getZoneId, getLandId } from "../world/CoordSystem";
-import { worldToScene } from "../world/CoordSystem";
+import { sceneToWorld, worldToScene, getZoneId, getLandId } from "../world/CoordSystem";
 import { TILE_SCALE, SCENE_SIZE } from "../world/WorldConfig";
 import type { PlacedAsset, AssetDef } from "../editor/types";
 
@@ -139,7 +138,8 @@ export const WorldMap = forwardRef<WorldMapHandle, WorldMapProps>(
       const scene  = new Scene(engine);
       sceneRef.current = scene;
 
-      scene.clearColor = new Color4(0.09, 0.11, 0.17, 1);
+      // Sky colour matches grassland so any tiny gaps read as terrain, not void
+      scene.clearColor = new Color4(0.36, 0.52, 0.24, 1);
 
       const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
       hemi.intensity = 1.3;
@@ -149,6 +149,23 @@ export const WorldMap = forwardRef<WorldMapHandle, WorldMapProps>(
       sun.intensity = 0.5;
 
       const cam = createWorldCamera(scene, canvas);
+
+      // ── Infinite background plane ──────────────────────────────────────────
+      // A massive flat ground below the terrain chunks acts as an absolute
+      // safety net — if anything slips through the chunk grid the player sees
+      // terrain-coloured ground, never black void.
+      const bgMesh = MeshBuilder.CreateGround(
+        "infiniteBackground",
+        { width: 200_000, height: 200_000 },
+        scene,
+      );
+      bgMesh.position = new Vector3(SCENE_SIZE / 2, -0.5, SCENE_SIZE / 2);
+      bgMesh.isPickable = false;
+      const bgMat = new StandardMaterial("bgMat", scene);
+      bgMat.diffuseColor  = new Color3(0.36, 0.52, 0.24); // grassland green
+      bgMat.specularColor = Color3.Black();
+      bgMat.ambientColor  = new Color3(1, 1, 1);
+      bgMesh.material = bgMat;
 
       const streamer = new ChunkStreamer(scene);
       streamerRef.current = streamer;

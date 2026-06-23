@@ -4,7 +4,7 @@ import {
 import {
   CAM_ALPHA, CAM_BETA,
   CAM_RADIUS_INIT, CAM_RADIUS_MIN, CAM_RADIUS_MAX,
-  SCENE_SIZE,
+  SCENE_SIZE, CHUNK_SCENE_SIZE,
 } from "../world/WorldConfig";
 
 const HALF = SCENE_SIZE / 2;
@@ -68,14 +68,16 @@ export function createWorldCamera(
           lastY = ev.clientY;
 
           // Pan scale proportional to zoom level
-          const panScale = cam.radius / 900;
+          const panScale = cam.radius / 500;
 
           cam.target.x -= (dx * RIGHT_X + dy * FWD_X) * panScale;
           cam.target.z -= (dx * RIGHT_Z + dy * FWD_Z) * panScale;
 
-          // Clamp to world bounds
-          cam.target.x = Math.max(0, Math.min(SCENE_SIZE, cam.target.x));
-          cam.target.z = Math.max(0, Math.min(SCENE_SIZE, cam.target.z));
+          // Soft clamp — keep camera over the valid coordinate space but
+          // chunks stream beyond, so there is always terrain at the edges.
+          const pad = CHUNK_SCENE_SIZE * 2;
+          cam.target.x = Math.max(-pad, Math.min(SCENE_SIZE + pad, cam.target.x));
+          cam.target.z = Math.max(-pad, Math.min(SCENE_SIZE + pad, cam.target.z));
         }
         break;
 

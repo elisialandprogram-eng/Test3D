@@ -29,7 +29,8 @@ export class ChunkStreamer {
   private key(cx: number, cy: number) { return `${cx},${cy}`; }
 
   private buildChunk(cx: number, cy: number): void {
-    if (cx < 0 || cy < 0 || cx >= CHUNKS_PER_AXIS || cy >= CHUNKS_PER_AXIS) return;
+    // No bounds check — chunks generate at any position so terrain always fills
+    // the viewport and world edges are never exposed.
     const k = this.key(cx, cy);
     if (this.loaded.has(k)) return;
 

@@ -45,11 +45,10 @@ function fbm(x: number, y: number, octaves = 5): number {
 }
 
 export function getTerrainType(wx: number, wy: number): TerrainType {
+  // Normalise using a fixed scale so noise is consistent at any coordinate,
+  // including chunks generated outside the 0–2047 world bounds.
   const nx = wx / 2048;
   const ny = wy / 2048;
-
-  const edgeDist = Math.min(nx, ny, 1 - nx, 1 - ny);
-  if (edgeDist < 0.03) return "water";
 
   const continent = fbm(nx * 3,       ny * 3,       4);
   if (continent < 0.30) return "water";
