@@ -53,6 +53,16 @@ const KINGDOM_NAMES = [
   "Ironmark","Brightgate","Stormmoor","Goldridge","Frostgate","Duskfall",
   "Ravenveil","Oakridge","Crystalgate","Windmore","Ironsun","Silverblade",
   "Thornbrook","Ashcroft","Duskhollow","Starfang","Grimvale","Copperfen",
+  "Ironbastion","Silverspire","Thornhaven","Ashmere","Brightcliff","Stormfen",
+  "Goldhaven","Frostcrest","Emberveil","Shadowridge","Dawnwall","Coppermark",
+  "Ravencroft","Oakwall","Crystalmere","Windgate","Ironvale","Silvercrest",
+  "Thornmark","Ashwall","Brightfen","Starveil","Grimgate","Coppercliff",
+  "Dawncroft","Embercroft","Shadowgate","Irongate","Greycroft","Leafcrest",
+  "Brightveil","Darkwall","Silvermere","Ashcrest","Goldgate","Frostcroft",
+  "Highmark","Ironglen","Sunwall","Blackfen","Greycrest","Willowgate",
+  "Coppercroft","Thorngate","Starcroft","Dawnglen","Embervale","Shadowcroft",
+  "Ironspire","Brightmark","Stormcrest","Goldcroft","Frostmark","Duskridge",
+  "Ravenglen","Oakmark","Crystalcroft","Windridge","Ironcleft","Silverwood",
 ];
 
 function seededRnd(seed: number): number {
@@ -71,20 +81,20 @@ export function generateEntities(terrain: TerrainType[][]): WorldEntities {
   function key(col: number, row: number) { return `${col},${row}`; }
   function rnd(seed: number) { return seededRnd(seed); }
   function isFree(c: number, r: number) {
-    if (c < 2 || r < 2 || c >= GRID_COLS - 2 || r >= GRID_ROWS - 2) return false;
+    if (c < 3 || r < 3 || c >= GRID_COLS - 3 || r >= GRID_ROWS - 3) return false;
     if (TERRAIN_BLOCKED.has(terrain[r][c])) return false;
     return !occupied.has(key(c, r));
   }
 
   let sid = 1;
 
-  // --- Kingdoms (100 total) ---
-  const MIN_KINGDOM_DIST = 5;
+  // --- Kingdoms (400 total for 256×256 map) ---
+  const MIN_KINGDOM_DIST = 7;
   let kidAttempts = 0;
-  while (kingdoms.length < 100 && kidAttempts < 20000) {
+  while (kingdoms.length < 400 && kidAttempts < 80000) {
     kidAttempts++;
-    const col = 2 + Math.floor(rnd(sid++) * (GRID_COLS - 4));
-    const row = 2 + Math.floor(rnd(sid++) * (GRID_ROWS - 4));
+    const col = 4 + Math.floor(rnd(sid++) * (GRID_COLS - 8));
+    const row = 4 + Math.floor(rnd(sid++) * (GRID_ROWS - 8));
     if (!isFree(col, row)) continue;
     const tooClose = kingdoms.some(k =>
       Math.abs(k.col - col) < MIN_KINGDOM_DIST && Math.abs(k.row - row) < MIN_KINGDOM_DIST
@@ -95,29 +105,32 @@ export function generateEntities(terrain: TerrainType[][]): WorldEntities {
       id: kingdoms.length,
       col, row,
       name: KINGDOM_NAMES[kingdoms.length % KINGDOM_NAMES.length],
-      level: 1 + Math.floor(rnd(sid++) * 20),
+      level: 1 + Math.floor(rnd(sid++) * 25),
       colorIdx: Math.floor(rnd(sid++) * 8),
     });
   }
 
-  // --- Resource nodes ---
-  const RESOURCE_DIST: Record<ResourceType, number> = { WOOD: 3, STONE: 3, FOOD: 3, GOLD: 4, CRYSTAL: 5 };
+  // --- Resource nodes (~1500 total) ---
+  const RESOURCE_DIST: Record<ResourceType, number> = {
+    WOOD: 2, STONE: 3, FOOD: 2, GOLD: 4, CRYSTAL: 5,
+  };
   const RESOURCE_COUNTS: [ResourceType, number][] = [
-    ["WOOD", 100], ["STONE", 80], ["FOOD", 75], ["GOLD", 55], ["CRYSTAL", 35],
+    ["WOOD", 420], ["STONE", 340], ["FOOD", 310], ["GOLD", 250], ["CRYSTAL", 180],
   ];
 
   for (const [type, count] of RESOURCE_COUNTS) {
     let attempts = 0;
     let placed = 0;
     const minDist = RESOURCE_DIST[type];
-    while (placed < count && attempts < count * 60) {
+    while (placed < count && attempts < count * 40) {
       attempts++;
-      const col = 1 + Math.floor(rnd(sid++) * (GRID_COLS - 2));
-      const row = 1 + Math.floor(rnd(sid++) * (GRID_ROWS - 2));
+      const col = 2 + Math.floor(rnd(sid++) * (GRID_COLS - 4));
+      const row = 2 + Math.floor(rnd(sid++) * (GRID_ROWS - 4));
       if (!isFree(col, row)) continue;
-      const tooClose = resources
-        .filter(r => r.type === type)
-        .some(r => Math.abs(r.col - col) < minDist && Math.abs(r.row - row) < minDist);
+      const sameType = resources.filter(r => r.type === type);
+      const tooClose = sameType.some(r =>
+        Math.abs(r.col - col) < minDist && Math.abs(r.row - row) < minDist
+      );
       if (tooClose) continue;
       occupied.add(key(col, row));
       resources.push({
@@ -129,12 +142,12 @@ export function generateEntities(terrain: TerrainType[][]): WorldEntities {
     }
   }
 
-  // --- Monster camps ---
+  // --- Monster camps (~500 total) ---
   let mattempts = 0;
-  while (monsters.length < 120 && mattempts < 15000) {
+  while (monsters.length < 500 && mattempts < 60000) {
     mattempts++;
-    const col = 2 + Math.floor(rnd(sid++) * (GRID_COLS - 4));
-    const row = 2 + Math.floor(rnd(sid++) * (GRID_ROWS - 4));
+    const col = 3 + Math.floor(rnd(sid++) * (GRID_COLS - 6));
+    const row = 3 + Math.floor(rnd(sid++) * (GRID_ROWS - 6));
     if (!isFree(col, row)) continue;
     const tooClose = monsters.some(m =>
       Math.abs(m.col - col) < 3 && Math.abs(m.row - row) < 3
@@ -151,9 +164,21 @@ export function generateEntities(terrain: TerrainType[][]): WorldEntities {
   // Build lookup maps
   const entityMap = new Map<string, "kingdom" | "resource" | "monster">();
   const entityIndex = new Map<string, Kingdom | ResourceNode | MonsterCamp>();
-  for (const k of kingdoms) { entityMap.set(key(k.col, k.row), "kingdom"); entityIndex.set(key(k.col, k.row), k); }
-  for (const r of resources) { entityMap.set(key(r.col, r.row), "resource"); entityIndex.set(key(r.col, r.row), r); }
-  for (const m of monsters) { entityMap.set(key(m.col, m.row), "monster"); entityIndex.set(key(m.col, m.row), m); }
+  for (const k of kingdoms) {
+    const k2 = key(k.col, k.row);
+    entityMap.set(k2, "kingdom");
+    entityIndex.set(k2, k);
+  }
+  for (const r of resources) {
+    const k2 = key(r.col, r.row);
+    entityMap.set(k2, "resource");
+    entityIndex.set(k2, r);
+  }
+  for (const m of monsters) {
+    const k2 = key(m.col, m.row);
+    entityMap.set(k2, "monster");
+    entityIndex.set(k2, m);
+  }
 
   return { kingdoms, resources, monsters, entityMap, entityIndex };
 }

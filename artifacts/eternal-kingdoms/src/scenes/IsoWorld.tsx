@@ -2,8 +2,9 @@ import { useRef, useEffect, useCallback } from "react";
 import {
   TILE_W, TILE_H, FACE_H,
   GRID_COLS, GRID_ROWS,
+  MIN_ZOOM, MAX_ZOOM, INITIAL_ZOOM,
   tileToScreen, screenToTile,
-  renderOrder, getInitialCamera,
+  renderOrder, getInitialCamera, clampCamera,
 } from "../engine/IsoEngine";
 import { generateTerrain, TerrainType } from "../world/TerrainGen";
 import {

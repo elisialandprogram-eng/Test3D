@@ -1,8 +1,18 @@
-export const TILE_W = 128;
-export const TILE_H = 64;
-export const FACE_H = 18;
-export const GRID_COLS = 80;
-export const GRID_ROWS = 80;
+export const TILE_W = 64;
+export const TILE_H = 32;
+export const FACE_H = 12;
+export const GRID_COLS = 256;
+export const GRID_ROWS = 256;
+
+export const MIN_ZOOM = 0.28;
+export const MAX_ZOOM = 2.5;
+export const INITIAL_ZOOM = 0.65;
+
+// Bounding box of the entire isometric map in iso-space
+export const MAP_ISO_MIN_X = -(GRID_ROWS - 1) * (TILE_W / 2);          // left-most point
+export const MAP_ISO_MAX_X = (GRID_COLS - 1) * (TILE_W / 2) + TILE_W;  // right-most point
+export const MAP_ISO_MIN_Y = 0;
+export const MAP_ISO_MAX_Y = (GRID_COLS + GRID_ROWS - 2) * (TILE_H / 2) + TILE_H + FACE_H;
 
 export interface ScreenPos { x: number; y: number }
 
@@ -32,38 +42,87 @@ export function screenToTile(
   return { col, row };
 }
 
-export function isTileVisible(
-  sx: number, sy: number, zoom: number,
-  cw: number, ch: number, extraH = 160
-): boolean {
-  const w = TILE_W * zoom;
-  const h = (TILE_H + FACE_H) * zoom + extraH;
-  return sx + w > -w && sx < cw + w && sy + h > -extraH && sy < ch + h;
+/** Clamp camera so the map bounding box never leaves the screen. */
+export function clampCamera(camX: number, camY: number, zoom: number, cw: number, ch: number) {
+  const mapW = (MAP_ISO_MAX_X - MAP_ISO_MIN_X) * zoom;
+  const mapH = (MAP_ISO_MAX_Y - MAP_ISO_MIN_Y) * zoom;
+
+  let cx: number, cy: number;
+
+  if (mapW >= cw) {
+    // Map wider than viewport: clamp edges
+    const maxCamX = -MAP_ISO_MIN_X * zoom;       // left edge of map at screen left
+    const minCamX = cw - MAP_ISO_MAX_X * zoom;   // right edge of map at screen right
+    cx = Math.max(minCamX, Math.min(maxCamX, camX));
+  } else {
+    // Map narrower than viewport: center it
+    cx = (cw - mapW) / 2 - MAP_ISO_MIN_X * zoom;
+  }
+
+  if (mapH >= ch) {
+    const maxCamY = -MAP_ISO_MIN_Y * zoom;
+    const minCamY = ch - MAP_ISO_MAX_Y * zoom;
+    cy = Math.max(minCamY, Math.min(maxCamY, camY));
+  } else {
+    cy = (ch - mapH) / 2 - MAP_ISO_MIN_Y * zoom;
+  }
+
+  return { x: cx, y: cy };
 }
 
+export function getInitialCamera(cw: number, ch: number, zoom: number) {
+  // Center on map center (col=128, row=128)
+  const centerCol = Math.floor(GRID_COLS / 2);
+  const centerRow = Math.floor(GRID_ROWS / 2);
+  const iso = tileToIso(centerCol, centerRow);
+  const rawCamX = cw / 2 - iso.x * zoom;
+  const rawCamY = ch / 2 - iso.y * zoom;
+  return clampCamera(rawCamX, rawCamY, zoom, cw, ch);
+}
+
+/** Compute visible tile col/row range from camera + viewport — O(1). */
+function getVisibleTileRange(camX: number, camY: number, zoom: number, cw: number, ch: number) {
+  const PAD = 3;
+  // Convert screen corners to iso coords
+  const corners = [
+    { sx: 0,  sy: 0  },
+    { sx: cw, sy: 0  },
+    { sx: 0,  sy: ch },
+    { sx: cw, sy: ch },
+  ].map(({ sx, sy }) => {
+    const isoX = (sx - camX) / zoom;
+    const isoY = (sy - camY) / zoom;
+    return {
+      col: (isoX / (TILE_W / 2) + isoY / (TILE_H / 2)) / 2,
+      row: (isoY / (TILE_H / 2) - isoX / (TILE_W / 2)) / 2,
+    };
+  });
+
+  const colMin = Math.max(0, Math.floor(Math.min(...corners.map(c => c.col))) - PAD);
+  const colMax = Math.min(GRID_COLS - 1, Math.ceil(Math.max(...corners.map(c => c.col))) + PAD);
+  const rowMin = Math.max(0, Math.floor(Math.min(...corners.map(c => c.row))) - PAD);
+  const rowMax = Math.min(GRID_ROWS - 1, Math.ceil(Math.max(...corners.map(c => c.row))) + PAD);
+
+  return { colMin, colMax, rowMin, rowMax };
+}
+
+/** Yield visible tiles in correct isometric painter order (back-to-front). */
 export function* renderOrder(
   camX: number, camY: number, zoom: number,
   cw: number, ch: number
 ): Generator<[number, number]> {
-  for (let d = 0; d <= GRID_COLS + GRID_ROWS - 2; d++) {
-    const colMin = Math.max(0, d - GRID_ROWS + 1);
-    const colMax = Math.min(GRID_COLS - 1, d);
-    for (let col = colMin; col <= colMax; col++) {
+  const { colMin, colMax, rowMin, rowMax } = getVisibleTileRange(camX, camY, zoom, cw, ch);
+  const dMin = colMin + rowMin;
+  const dMax = colMax + rowMax;
+
+  for (let d = dMin; d <= dMax; d++) {
+    const cStart = Math.max(colMin, d - rowMax);
+    const cEnd   = Math.min(colMax, d - rowMin);
+    for (let col = cStart; col <= cEnd; col++) {
       const row = d - col;
-      const { x, y } = tileToScreen(col, row, camX, camY, zoom);
-      if (isTileVisible(x, y, zoom, cw, ch)) {
+      if (row >= rowMin && row <= rowMax) {
         yield [col, row];
       }
     }
   }
-}
-
-export function getInitialCamera(cw: number, ch: number, zoom: number) {
-  const centerCol = GRID_COLS / 2;
-  const centerRow = GRID_ROWS / 2;
-  const iso = tileToIso(centerCol, centerRow);
-  return {
-    camX: cw / 2 - iso.x * zoom,
-    camY: ch / 2 - iso.y * zoom,
-  };
 }
