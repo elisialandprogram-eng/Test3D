@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback } from "react";
 import {
-  TILE_W, TILE_H, FACE_H,
+  TILE_W, TILE_H,
   GRID_COLS, GRID_ROWS,
   MAX_ZOOM, INITIAL_ZOOM,
   tileToScreen, screenToTile,
@@ -9,13 +9,57 @@ import {
 import { generateTerrain, TerrainType } from "../world/TerrainGen";
 
 // ─── Terrain flat colours ─────────────────────────────────────────────────────
-// Forest floor is lighter than canopy so trees stand out clearly
 const TILE_COLOR: Record<TerrainType, string> = {
   PLAIN:  "#78C840",
   FOREST: "#70BB34",
 };
 
-// ─── Tile drawing — flat diamond, expanded 0.5 px to eliminate anti-alias seams
+// ─── Entities scattered across the map ───────────────────────────────────────
+type EntityKind = "building" | "resource";
+interface MapEntity {
+  col: number;
+  row: number;
+  kind: EntityKind;
+  id: number; // sprite file number
+}
+
+// Buildings clustered near map centre; resources scattered wider
+const ENTITIES: MapEntity[] = [
+  // ── Buildings (settlement ~col 120-140, row 118-138) ──
+  { col: 122, row: 120, kind: "building", id: 5  },
+  { col: 126, row: 122, kind: "building", id: 10 },
+  { col: 130, row: 120, kind: "building", id: 2  },
+  { col: 134, row: 123, kind: "building", id: 7  },
+  { col: 120, row: 126, kind: "building", id: 9  },
+  { col: 125, row: 128, kind: "building", id: 4  },
+  { col: 132, row: 128, kind: "building", id: 6  },
+  { col: 138, row: 126, kind: "building", id: 3  },
+  { col: 128, row: 134, kind: "building", id: 11 },
+  { col: 136, row: 132, kind: "building", id: 13 },
+  // ── Resources (broader scatter) ──
+  { col: 110, row: 112, kind: "resource", id: 3  },
+  { col: 116, row: 108, kind: "resource", id: 5  },
+  { col: 142, row: 110, kind: "resource", id: 1  },
+  { col: 148, row: 115, kind: "resource", id: 6  },
+  { col: 108, row: 130, kind: "resource", id: 2  },
+  { col: 112, row: 138, kind: "resource", id: 4  },
+  { col: 145, row: 133, kind: "resource", id: 7  },
+  { col: 150, row: 140, kind: "resource", id: 9  },
+  { col: 120, row: 144, kind: "resource", id: 11 },
+  { col: 134, row: 146, kind: "resource", id: 8  },
+  { col: 138, row: 115, kind: "resource", id: 10 },
+  { col: 105, row: 122, kind: "resource", id: 13 },
+];
+
+// Build a lookup map for O(1) per-tile access during render
+type EntityMap = Map<string, MapEntity>;
+function buildEntityMap(): EntityMap {
+  const m = new Map<string, MapEntity>();
+  for (const e of ENTITIES) m.set(`${e.col},${e.row}`, e);
+  return m;
+}
+
+// ─── Tile drawing ─────────────────────────────────────────────────────────────
 function drawTile(
   ctx: CanvasRenderingContext2D,
   sx: number, sy: number, zoom: number,
@@ -23,7 +67,7 @@ function drawTile(
 ) {
   const w = TILE_W * zoom;
   const h = TILE_H * zoom;
-  const e = 0.6; // overdraw half-pixel to close sub-pixel seams
+  const e = 0.6;
 
   ctx.beginPath();
   ctx.moveTo(sx + w / 2,     sy - e);
@@ -35,7 +79,7 @@ function drawTile(
   ctx.fill();
 }
 
-// ─── Tree drawing (no tile clip — trees naturally overflow for organic look) ──
+// ─── Tree drawing ─────────────────────────────────────────────────────────────
 function drawTrees(
   ctx: CanvasRenderingContext2D,
   sx: number, sy: number, zoom: number,
@@ -48,7 +92,6 @@ function drawTrees(
   const h = TILE_H * zoom;
   const cx = sx + w / 2;
   const cy = sy + h / 2;
-
   const seed = col * 137 + row * 31;
 
   if (terrain === "FOREST") {
@@ -59,40 +102,33 @@ function drawTrees(
       const dy = (((s >> 4) % 200) / 200 - 0.5) * h * 0.55;
       const tx = cx + dx;
       const ty = cy + dy;
-      // Trees sized as ~50-60% of tile width so they're bold and visible at any zoom
       const r1 = w * (0.50 + ((s >> 2) % 8) * 0.015);
       const trunkW = w * 0.045;
       const trunkH = r1 * 0.55;
 
-      // Trunk
       ctx.fillStyle = "#5C3A18";
       ctx.fillRect(tx - trunkW, ty, trunkW * 2, trunkH);
 
-      // Shadow blob under canopy
       ctx.beginPath();
       ctx.arc(tx, ty - r1 * 0.05, r1 * 0.90, 0, Math.PI * 2);
       ctx.fillStyle = "#1E4008";
       ctx.fill();
 
-      // Main canopy
       ctx.beginPath();
       ctx.arc(tx, ty - r1 * 0.45, r1, 0, Math.PI * 2);
       ctx.fillStyle = "#2A5C10";
       ctx.fill();
 
-      // Mid-tone layer
       ctx.beginPath();
       ctx.arc(tx + r1 * 0.18, ty - r1 * 0.90, r1 * 0.72, 0, Math.PI * 2);
       ctx.fillStyle = "#367818";
       ctx.fill();
 
-      // Highlight cap
       ctx.beginPath();
       ctx.arc(tx - r1 * 0.10, ty - r1 * 1.30, r1 * 0.50, 0, Math.PI * 2);
       ctx.fillStyle = "#469C1E";
       ctx.fill();
 
-      // Bright top specular
       ctx.beginPath();
       ctx.arc(tx, ty - r1 * 1.60, r1 * 0.28, 0, Math.PI * 2);
       ctx.fillStyle = "#5CB828";
@@ -101,7 +137,6 @@ function drawTrees(
   }
 
   if (terrain === "PLAIN") {
-    // Sparse isolated tree on ~1 in 7 plain tiles for variety
     if ((seed % 7) === 0) {
       const tx = cx + ((seed % 40) - 20) * w * 0.015;
       const ty = cy + ((seed % 28) - 14) * h * 0.015;
@@ -121,6 +156,31 @@ function drawTrees(
       ctx.fill();
     }
   }
+}
+
+// ─── Sprite drawing ───────────────────────────────────────────────────────────
+function drawSprite(
+  ctx: CanvasRenderingContext2D,
+  sx: number, sy: number, zoom: number,
+  entity: MapEntity,
+  images: Map<string, HTMLImageElement>,
+) {
+  const key = `${entity.kind}/${entity.id}`;
+  const img = images.get(key);
+  if (!img || !img.complete || img.naturalWidth === 0) return;
+
+  const w = TILE_W * zoom;
+  const h = TILE_H * zoom;
+
+  // Scale factor: buildings cover ~3 tiles wide, resources ~2 tiles wide
+  const scale = entity.kind === "building" ? w * 3.0 : w * 2.0;
+  const aspectH = (img.naturalHeight / img.naturalWidth) * scale;
+
+  // Anchor: bottom-centre of sprite sits at the centre of the tile's top diamond point
+  const anchorX = sx + w / 2;
+  const anchorY = sy + h / 2; // tile vertical centre
+
+  ctx.drawImage(img, anchorX - scale / 2, anchorY - aspectH * 0.85, scale, aspectH);
 }
 
 // ─── Selection highlight ──────────────────────────────────────────────────────
@@ -164,6 +224,10 @@ export function IsoWorld({ onHover }: IsoWorldProps) {
   const rafRef = useRef<number>(0);
   const needsRender = useRef(true);
 
+  // Sprite image cache
+  const imagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const entityMapRef = useRef<EntityMap>(buildEntityMap());
+
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -177,13 +241,16 @@ export function IsoWorld({ onHover }: IsoWorldProps) {
     const terrain = terrainRef.current;
     const zoom = zoomRef.current;
     const { x: camX, y: camY } = camRef.current;
+    const images = imagesRef.current;
+    const entityMap = entityMapRef.current;
 
     if (!terrain) { rafRef.current = requestAnimationFrame(render); return; }
 
     ctx.fillStyle = "#2A4A10";
     ctx.fillRect(0, 0, cw, ch);
 
-    const tiles = renderOrder(camX, camY, zoom, cw, ch);
+    // Collect into array — generator is exhausted after one pass
+    const tiles = [...renderOrder(camX, camY, zoom, cw, ch)];
 
     // Pass 1: tiles
     for (const [col, row] of tiles) {
@@ -192,14 +259,24 @@ export function IsoWorld({ onHover }: IsoWorldProps) {
       drawTile(ctx, sx, sy, zoom, t);
     }
 
-    // Pass 2: trees (drawn after all tiles so canopy can overlap borders naturally)
+    // Pass 2: trees
     for (const [col, row] of tiles) {
       const t = terrain[row][col];
+      const entity = entityMap.get(`${col},${row}`);
+      if (entity) continue; // skip trees on entity tiles — sprite will cover them
       const { x: sx, y: sy } = tileToScreen(col, row, camX, camY, zoom);
       drawTrees(ctx, sx, sy, zoom, col, row, t);
     }
 
-    // Pass 3: selection
+    // Pass 3: entity sprites (sorted back-to-front via renderOrder already)
+    for (const [col, row] of tiles) {
+      const entity = entityMap.get(`${col},${row}`);
+      if (!entity) continue;
+      const { x: sx, y: sy } = tileToScreen(col, row, camX, camY, zoom);
+      drawSprite(ctx, sx, sy, zoom, entity, images);
+    }
+
+    // Pass 4: selection
     const sel = selectedTileRef.current;
     if (sel) {
       const { x: sx, y: sy } = tileToScreen(sel.col, sel.row, camX, camY, zoom);
@@ -233,6 +310,18 @@ export function IsoWorld({ onHover }: IsoWorldProps) {
 
     terrainRef.current = generateTerrain(GRID_COLS, GRID_ROWS);
     needsRender.current = true;
+
+    // Preload all entity sprites
+    const images = imagesRef.current;
+    for (const entity of ENTITIES) {
+      const key = `${entity.kind}/${entity.id}`;
+      if (!images.has(key)) {
+        const img = new Image();
+        img.src = `/sprites/${entity.kind}s/${entity.id}.png`;
+        img.onload = () => { needsRender.current = true; };
+        images.set(key, img);
+      }
+    }
 
     rafRef.current = requestAnimationFrame(render);
     return () => {
