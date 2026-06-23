@@ -1,4 +1,4 @@
-export type TerrainType = "PLAIN" | "FOREST" | "HILL" | "MOUNTAIN" | "AGRICULTURAL" | "WATERFRONT";
+export type TerrainType = "PLAIN" | "FOREST";
 
 function noise(col: number, row: number): number {
   return (
@@ -20,44 +20,15 @@ function noise2(col: number, row: number): number {
 
 export function generateTerrain(cols: number, rows: number): TerrainType[][] {
   const terrain: TerrainType[][] = [];
-
   for (let row = 0; row < rows; row++) {
     terrain[row] = [];
     for (let col = 0; col < cols; col++) {
-      const n = noise(col, row);
+      const n  = noise(col, row);
       const n2 = noise2(col, row);
-      const distEdge = Math.min(col, row, cols - 1 - col, rows - 1 - row) / (Math.min(cols, rows) * 0.18);
-      const edgeBias = Math.max(0, 1 - distEdge);
-
-      let t: TerrainType;
-      const elevated = n + edgeBias * 0.3;
-
-      if (elevated > 0.80) t = "MOUNTAIN";
-      else if (elevated > 0.67) t = "HILL";
-      else if (n < 0.28 && n2 < 0.45) t = "WATERFRONT";
-      else if (n < 0.44 && n2 > 0.56) t = "FOREST";
-      else if (n2 > 0.74 && n > 0.42 && n < 0.68) t = "AGRICULTURAL";
-      else t = "PLAIN";
-
-      terrain[row][col] = t;
+      const isForest = (n < 0.40 && n2 < 0.60) || (n2 > 0.70 && n < 0.55);
+      terrain[row][col] = isForest ? "FOREST" : "PLAIN";
     }
   }
-
-  // Smooth isolated WATERFRONT tiles
-  for (let row = 1; row < rows - 1; row++) {
-    for (let col = 1; col < cols - 1; col++) {
-      if (terrain[row][col] === "WATERFRONT") {
-        const nb = [
-          terrain[row - 1][col], terrain[row + 1][col],
-          terrain[row][col - 1], terrain[row][col + 1],
-        ];
-        if (nb.filter(x => x === "WATERFRONT").length === 0) {
-          terrain[row][col] = "PLAIN";
-        }
-      }
-    }
-  }
-
   return terrain;
 }
 
