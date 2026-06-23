@@ -2,9 +2,9 @@ import { useRef, useEffect, useCallback } from "react";
 import {
   TILE_W, TILE_H, FACE_H,
   GRID_COLS, GRID_ROWS,
-  MIN_ZOOM, MAX_ZOOM, INITIAL_ZOOM,
+  MAX_ZOOM, INITIAL_ZOOM,
   tileToScreen, screenToTile,
-  renderOrder, getInitialCamera, clampCamera,
+  renderOrder, getInitialCamera, clampCamera, computeMinZoom,
 } from "../engine/IsoEngine";
 import { generateTerrain, TerrainType } from "../world/TerrainGen";
 import {
@@ -635,7 +635,8 @@ export function IsoWorld({ onSelect, onHover }: IsoWorldProps) {
 
   // Camera state (mutable refs — no re-render needed)
   const camRef = useRef({ x: 0, y: 0 });
-  const zoomRef = useRef(0.45);
+  const zoomRef = useRef(INITIAL_ZOOM);
+  const viewportRef = useRef({ w: 1, h: 1 });
   const dragRef = useRef<{ startX: number; startY: number; camX: number; camY: number } | null>(null);
   const isDragging = useRef(false);
 
@@ -723,8 +724,14 @@ export function IsoWorld({ onSelect, onHover }: IsoWorldProps) {
       if (!canvas) return;
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
-      const init = getInitialCamera(canvas.width, canvas.height, zoomRef.current);
-      camRef.current = { x: init.camX, y: init.camY };
+      const cw = canvas.width;
+      const ch = canvas.height;
+      viewportRef.current = { w: cw, h: ch };
+      // Enforce min zoom for new viewport size
+      const minZoom = computeMinZoom(cw, ch);
+      if (zoomRef.current < minZoom) zoomRef.current = minZoom;
+      const init = getInitialCamera(cw, ch, zoomRef.current);
+      camRef.current = { x: init.x, y: init.y };
       needsRender.current = true;
     }
 
@@ -774,10 +781,13 @@ export function IsoWorld({ onSelect, onHover }: IsoWorldProps) {
       isDragging.current = true;
     }
     if (!isDragging.current) return;
-    camRef.current = {
+    const rawCam = {
       x: dragRef.current.camX + dx,
       y: dragRef.current.camY + dy,
     };
+    const { w: cw, h: ch } = viewportRef.current;
+    const clamped = clampCamera(rawCam.x, rawCam.y, zoomRef.current, cw, ch);
+    camRef.current = { x: clamped.x, y: clamped.y };
     needsRender.current = true;
   }, [onHover]);
 
@@ -816,16 +826,21 @@ export function IsoWorld({ onSelect, onHover }: IsoWorldProps) {
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
 
+    const { w: cw, h: ch } = viewportRef.current;
+    const minZoom = computeMinZoom(cw, ch);
+
     const oldZoom = zoomRef.current;
     const delta = e.deltaY > 0 ? 0.88 : 1.13;
-    const newZoom = Math.max(0.12, Math.min(2.2, oldZoom * delta));
+    const newZoom = Math.max(minZoom, Math.min(MAX_ZOOM, oldZoom * delta));
     zoomRef.current = newZoom;
 
-    // Zoom toward mouse cursor
-    camRef.current = {
+    // Zoom toward mouse cursor, then clamp to map edges
+    const rawCam = {
       x: mx - (mx - camRef.current.x) * (newZoom / oldZoom),
       y: my - (my - camRef.current.y) * (newZoom / oldZoom),
     };
+    const clamped = clampCamera(rawCam.x, rawCam.y, newZoom, cw, ch);
+    camRef.current = { x: clamped.x, y: clamped.y };
     needsRender.current = true;
   }, []);
 

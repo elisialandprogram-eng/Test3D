@@ -4,7 +4,6 @@ export const FACE_H = 12;
 export const GRID_COLS = 256;
 export const GRID_ROWS = 256;
 
-export const MIN_ZOOM = 0.28;
 export const MAX_ZOOM = 2.5;
 export const INITIAL_ZOOM = 0.65;
 
@@ -13,6 +12,19 @@ export const MAP_ISO_MIN_X = -(GRID_ROWS - 1) * (TILE_W / 2);          // left-m
 export const MAP_ISO_MAX_X = (GRID_COLS - 1) * (TILE_W / 2) + TILE_W;  // right-most point
 export const MAP_ISO_MIN_Y = 0;
 export const MAP_ISO_MAX_Y = (GRID_COLS + GRID_ROWS - 2) * (TILE_H / 2) + TILE_H + FACE_H;
+
+/**
+ * Compute the minimum zoom such that the viewport never shows more than
+ * 50% of the map in either dimension (~25% of map area at once).
+ * Formula: min_zoom = max(2*cw / map_iso_w, 2*ch / map_iso_h)
+ */
+export function computeMinZoom(cw: number, ch: number): number {
+  const mapIsoW = MAP_ISO_MAX_X - MAP_ISO_MIN_X;
+  const mapIsoH = MAP_ISO_MAX_Y - MAP_ISO_MIN_Y;
+  const byWidth  = (2 * cw) / mapIsoW;
+  const byHeight = (2 * ch) / mapIsoH;
+  return Math.max(byWidth, byHeight, 0.15);
+}
 
 export interface ScreenPos { x: number; y: number }
 
