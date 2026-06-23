@@ -284,34 +284,6 @@ export function HUD({ state, onViewModeChange }: HUDProps) {
         )}
       </div>
 
-      {/* ── Bottom Right: Minimap ── */}
-      <div className="mmo-panel absolute bottom-4 right-4 p-3 flex flex-col items-center">
-        <div className="mmo-title text-[0.6rem] tracking-[0.2em] mb-2 flex items-center gap-2 w-full justify-center opacity-90 pb-2 border-b border-amber-900/30">
-          <span className="flex-1 h-px bg-gradient-to-r from-transparent to-amber-500/30" />
-          WORLD MAP
-          <span className="flex-1 h-px bg-gradient-to-l from-transparent to-amber-500/30" />
-        </div>
-
-        <div className="minimap-container">
-          <canvas
-            ref={minimapRef}
-            width={MINIMAP_SIZE}
-            height={MINIMAP_SIZE}
-            className="minimap-canvas block"
-          />
-        </div>
-
-        <div className="w-full flex justify-between items-center mt-2 px-1">
-          <div className="mmo-text text-[0.55rem] opacity-50 uppercase tracking-widest">
-            {VIEW_MODE_LABELS[viewMode]}
-          </div>
-          <div className="coord-display-container py-0.5">
-            <span className="coord-text text-[0.6rem]">
-              {coord.x.toFixed(0)},{coord.y.toFixed(0)}
-            </span>
-          </div>
-        </div>
-      </div>
     </>
   );
 }
