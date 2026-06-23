@@ -9,11 +9,14 @@ import {
   Color3,
   Color4,
   GlowLayer,
+  ArcRotateCamera,
+  MeshBuilder,
+  StandardMaterial,
   PointerEventTypes,
 } from "@babylonjs/core";
 
-import { createCamera, setupCameraControls, ViewMode } from "../engine/CameraEngine";
-import { worldToCoord, getZone, WORLD_SIZE } from "../engine/CoordinateEngine";
+import { setupCameraControls, ViewMode } from "../engine/CameraEngine";
+import { worldToCoord, getZone, WORLD_SIZE, WORLD_CENTER } from "../engine/CoordinateEngine";
 import { createWorldFloor } from "../world/WorldFloor";
 import { createCongress } from "../world/Congress";
 import { initLandSystem } from "../systems/LandSystem";
@@ -23,6 +26,7 @@ import { initShrineSystem } from "../systems/ShrineSystem";
 import { initResourceSystem } from "../systems/ResourceSystem";
 import { initMonsterSystem } from "../systems/MonsterSystem";
 import { initSelectionSystem, SelectionInfo } from "../systems/SelectionSystem";
+import { initKingdomCitySystem, getCityMeshes } from "../systems/KingdomCitySystem";
 
 export interface WorldStateUpdate {
   coord?: { x: number; y: number };
@@ -33,21 +37,19 @@ export interface WorldStateUpdate {
   cameraRadius?: number;
 }
 
+export interface CameraControls {
+  setViewMode: (mode: ViewMode) => void;
+  flyTo: (x: number, z: number, radius?: number) => void;
+}
+
 interface BabylonWorldProps {
   onStateChange: (updater: (prev: WorldStateUpdate) => WorldStateUpdate) => void;
+  onCameraReady?: (controls: CameraControls) => void;
 }
 
-function hasWebGL(): boolean {
-  try {
-    const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl"));
-  } catch {
-    return false;
-  }
-}
-
-export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
+export function BabylonWorld({ onStateChange, onCameraReady }: BabylonWorldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const engineRef = useRef<Engine | null>(null);
 
   const handleStateChange = useCallback(
     (partial: Partial<WorldStateUpdate>) => {
@@ -57,34 +59,57 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
   );
 
   useEffect(() => {
-    if (!hasWebGL()) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    let engine: Engine | null = null;
+    // Ensure canvas has pixel dimensions before engine init
+    canvas.width  = canvas.clientWidth  || window.innerWidth;
+    canvas.height = canvas.clientHeight || window.innerHeight;
+
+    let engine: Engine;
+    let scene: Scene;
 
     try {
       engine = new Engine(canvas, true, {
-        preserveDrawingBuffer: true,
+        preserveDrawingBuffer: false,
         stencil: true,
         antialias: true,
         failIfMajorPerformanceCaveat: false,
+        alpha: false,
       });
+      engineRef.current = engine;
+    } catch (err) {
+      console.error("[EK] Engine creation failed:", err);
+      return;
+    }
 
-      const scene = new Scene(engine);
+    try {
+      scene = new Scene(engine);
       scene.clearColor = new Color4(0.44, 0.67, 0.88, 1);
       scene.fogMode = Scene.FOGMODE_LINEAR;
       scene.fogColor = new Color3(0.44, 0.67, 0.88);
       scene.fogStart = 2600;
       scene.fogEnd = 3400;
 
-      const glow = new GlowLayer("WorldGlow", scene);
-      glow.intensity = 0.7;
-
-      const camera = createCamera(scene);
+      // Camera
+      const camera = new ArcRotateCamera(
+        "MainCamera",
+        -Math.PI / 4,
+        Math.PI / 3.5,
+        250,
+        new Vector3(WORLD_CENTER.x, 0, WORLD_CENTER.y),
+        scene
+      );
+      camera.lowerRadiusLimit = 20;
+      camera.upperRadiusLimit = 2500;
+      camera.lowerBetaLimit = 0.18;
+      camera.upperBetaLimit = Math.PI / 2.05;
+      camera.wheelPrecision = 0.3;
+      camera.inputs.removeByType("ArcRotateCameraPointersInput");
       camera.attachControl(canvas, true);
       scene.activeCamera = camera;
 
+      // Lighting
       const hemi = new HemisphericLight("HemiLight", new Vector3(0.2, 1, 0.3), scene);
       hemi.intensity = 1.2;
       hemi.diffuse = new Color3(1.0, 0.98, 0.92);
@@ -97,46 +122,68 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
 
       const shadowGen = new ShadowGenerator(512, sun);
       shadowGen.useBlurExponentialShadowMap = true;
-      shadowGen.blurScale = 2;
       shadowGen.bias = 0.001;
 
-      createWorldFloor(scene);
-      initLandSystem();
+      // Glow
+      const glow = new GlowLayer("WorldGlow", scene);
+      glow.intensity = 0.7;
 
-      initZoneSystem(scene);
-      setZoneOverlayVisible(false); // Zones hidden in FIELD view by default
+      // World content — each step wrapped individually to catch errors
+      try { createWorldFloor(scene); } catch (e) { console.error("[EK] WorldFloor:", e); }
+      try { initLandSystem(); }      catch (e) { console.error("[EK] LandSystem:", e); }
+      try { initZoneSystem(scene); setZoneOverlayVisible(false); } catch (e) { console.error("[EK] ZoneSystem:", e); }
 
-      const congressMeshes = createCongress(scene);
-      for (const m of congressMeshes) {
-        try { shadowGen.addShadowCaster(m, false); } catch { /* skip */ }
-      }
+      let congressMeshes: any[] = [];
+      try { congressMeshes = createCongress(scene); } catch (e) { console.error("[EK] Congress:", e); }
+      for (const m of congressMeshes) { try { shadowGen.addShadowCaster(m, false); } catch {} }
 
-      const kingdoms = initKingdomSystem(scene);
+      let kingdoms: any[] = [];
+      try { kingdoms = initKingdomSystem(scene); } catch (e) { console.error("[EK] KingdomSystem:", e); }
       for (const k of kingdoms) {
-        for (const m of k.meshes) {
-          try { shadowGen.addShadowCaster(m, false); } catch { /* skip */ }
-        }
+        for (const m of k.meshes) { try { shadowGen.addShadowCaster(m, false); } catch {} }
       }
+      try { initKingdomCitySystem(kingdoms, scene); } catch (e) { console.error("[EK] KingdomCitySystem:", e); }
+      for (const m of getCityMeshes()) { try { shadowGen.addShadowCaster(m, false); } catch {} }
 
-      const shrines = initShrineSystem(scene);
-      for (const s of shrines) {
-        for (const m of s.meshes) {
-          try { shadowGen.addShadowCaster(m, false); } catch { /* skip */ }
-        }
-      }
+      try { initShrineSystem(scene); }    catch (e) { console.error("[EK] ShrineSystem:", e); }
+      try { initResourceSystem(scene); }  catch (e) { console.error("[EK] ResourceSystem:", e); }
+      try { initMonsterSystem(scene); }   catch (e) { console.error("[EK] MonsterSystem:", e); }
 
-      initResourceSystem(scene);
-      initMonsterSystem(scene);
+      try {
+        initSelectionSystem(scene, (info) => handleStateChange({ selected: info }));
+      } catch (e) { console.error("[EK] SelectionSystem:", e); }
 
-      initSelectionSystem(scene, (info) => {
-        handleStateChange({ selected: info });
-      });
-
-      const _camControls = setupCameraControls(camera, scene, canvas, (mode) => {
+      // Camera controls
+      const camControls = setupCameraControls(camera, scene, canvas, (mode) => {
         setZoneOverlayVisible(mode === "WORLD");
         handleStateChange({ viewMode: mode });
       });
 
+      const controls: CameraControls = {
+        setViewMode: (mode: ViewMode) => {
+          if (mode === "WORLD") {
+            camera.radius = 1800;
+          } else if (mode === "FIELD") {
+            camera.radius = 250;
+            camera.beta = Math.PI / 3.5;
+          } else if (mode === "KINGDOM") {
+            // Top-down isometric view for kingdom detail
+            camera.radius = 180;
+            camera.beta = Math.PI / 2.3;
+          }
+          setZoneOverlayVisible(mode === "WORLD");
+          handleStateChange({ viewMode: mode });
+        },
+        flyTo: (x: number, z: number, radius?: number) => {
+          camera.target.x = x;
+          camera.target.z = z;
+          if (radius !== undefined) camera.radius = radius;
+        },
+      };
+
+      onCameraReady?.(controls);
+
+      // Pointer move for coordinate tracking
       scene.onPointerObservable.add((info) => {
         if (info.type !== PointerEventTypes.POINTERMOVE) return;
         const evt = info.event as PointerEvent;
@@ -148,8 +195,8 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
         }
       });
 
+      // Render loop
       engine.resize();
-
       let frame = 0;
       engine.runRenderLoop(() => {
         scene.render();
@@ -163,20 +210,25 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
         }
       });
 
-      const onResize = () => engine!.resize();
-      window.addEventListener("resize", onResize);
-
-      return () => {
-        window.removeEventListener("resize", onResize);
-        engine!.stopRenderLoop();
-        scene.dispose();
-        engine!.dispose();
-      };
+      console.log("[EK] Scene initialized successfully");
     } catch (err) {
-      console.error("[EternalKingdoms] Scene init failed:", err);
-      engine?.dispose();
+      console.error("[EK] Scene setup failed:", err);
     }
-  }, [handleStateChange]);
+
+    const onResize = () => {
+      canvas.width  = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+      engineRef.current?.resize();
+    };
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      engineRef.current?.stopRenderLoop();
+      engineRef.current?.dispose();
+      engineRef.current = null;
+    };
+  }, [handleStateChange, onCameraReady]);
 
   return (
     <canvas
@@ -184,14 +236,12 @@ export function BabylonWorld({ onStateChange }: BabylonWorldProps) {
       id="babylon-canvas"
       style={{
         position: "absolute",
-        top: 0,
-        left: 0,
+        inset: 0,
         width: "100%",
         height: "100%",
         display: "block",
         outline: "none",
         touchAction: "none",
-        cursor: "grab",
       }}
     />
   );

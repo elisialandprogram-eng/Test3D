@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { BabylonWorld, WorldStateUpdate } from "./scenes/BabylonWorld";
+import { BabylonWorld, WorldStateUpdate, CameraControls } from "./scenes/BabylonWorld";
 import { HUD } from "./components/HUD";
 import type { ViewMode } from "./engine/CameraEngine";
 import { WORLD_CENTER } from "./engine/CoordinateEngine";
@@ -15,7 +15,7 @@ const INITIAL_STATE: WorldStateUpdate = {
 
 export default function App() {
   const [worldState, setWorldState] = useState<WorldStateUpdate>(INITIAL_STATE);
-  const viewModeCallbackRef = useRef<((mode: ViewMode) => void) | null>(null);
+  const cameraRef = useRef<CameraControls | null>(null);
 
   const handleStateChange = useCallback(
     (updater: (prev: WorldStateUpdate) => WorldStateUpdate) => {
@@ -24,13 +24,34 @@ export default function App() {
     []
   );
 
+  const handleCameraReady = useCallback((controls: CameraControls) => {
+    cameraRef.current = controls;
+  }, []);
+
   const handleViewModeChange = useCallback((mode: ViewMode) => {
-    viewModeCallbackRef.current?.(mode);
+    const cam = cameraRef.current;
+    if (!cam) return;
+
+    cam.setViewMode(mode);
+
+    // If switching to KINGDOM view and a kingdom is selected, fly to it
+    if (mode === "KINGDOM") {
+      setWorldState((prev) => {
+        const sel = prev.selected;
+        if (sel?.entityType === "kingdom" && sel.coord) {
+          cam.flyTo(sel.coord.x, sel.coord.y, 180);
+        }
+        return { ...prev, viewMode: mode };
+      });
+    }
   }, []);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-black">
-      <BabylonWorld onStateChange={handleStateChange} />
+    <div style={{ position: "fixed", inset: 0, overflow: "hidden", background: "#000" }}>
+      <BabylonWorld
+        onStateChange={handleStateChange}
+        onCameraReady={handleCameraReady}
+      />
       <HUD state={worldState} onViewModeChange={handleViewModeChange} />
     </div>
   );
