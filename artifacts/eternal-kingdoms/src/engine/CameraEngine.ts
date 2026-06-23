@@ -143,7 +143,7 @@ export function setupCameraControls(
     }
   });
 
-  let edgeScrollActive = true;
+  let edgeScrollActive = false;
   scene.registerBeforeRender(() => {
     if (!edgeScrollActive || isDragging) return;
     const rect = canvas.getBoundingClientRect();

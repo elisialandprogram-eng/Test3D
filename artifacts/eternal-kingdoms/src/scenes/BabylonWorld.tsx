@@ -128,26 +128,18 @@ export function BabylonWorld({ onStateChange, onCameraReady }: BabylonWorldProps
       const glow = new GlowLayer("WorldGlow", scene);
       glow.intensity = 0.7;
 
-      // World content — each step wrapped individually to catch errors
+      // World content
       try { createWorldFloor(scene); } catch (e) { console.error("[EK] WorldFloor:", e); }
-      try { initLandSystem(); }      catch (e) { console.error("[EK] LandSystem:", e); }
+      try { initLandSystem(); }         catch (e) { console.error("[EK] LandSystem:", e); }
       try { initZoneSystem(scene); setZoneOverlayVisible(false); } catch (e) { console.error("[EK] ZoneSystem:", e); }
 
-      let congressMeshes: any[] = [];
-      try { congressMeshes = createCongress(scene); } catch (e) { console.error("[EK] Congress:", e); }
-      for (const m of congressMeshes) { try { shadowGen.addShadowCaster(m, false); } catch {} }
-
-      let kingdoms: any[] = [];
-      try { kingdoms = initKingdomSystem(scene); } catch (e) { console.error("[EK] KingdomSystem:", e); }
-      for (const k of kingdoms) {
-        for (const m of k.meshes) { try { shadowGen.addShadowCaster(m, false); } catch {} }
-      }
-      try { initKingdomCitySystem(kingdoms, scene); } catch (e) { console.error("[EK] KingdomCitySystem:", e); }
-      for (const m of getCityMeshes()) { try { shadowGen.addShadowCaster(m, false); } catch {} }
-
-      try { initShrineSystem(scene); }    catch (e) { console.error("[EK] ShrineSystem:", e); }
-      try { initResourceSystem(scene); }  catch (e) { console.error("[EK] ResourceSystem:", e); }
-      try { initMonsterSystem(scene); }   catch (e) { console.error("[EK] MonsterSystem:", e); }
+      // Objects disabled — terrain-only view
+      // try { createCongress(scene); }        catch (e) {}
+      // try { initKingdomSystem(scene); }     catch (e) {}
+      // try { initKingdomCitySystem(...); }   catch (e) {}
+      // try { initShrineSystem(scene); }      catch (e) {}
+      // try { initResourceSystem(scene); }    catch (e) {}
+      // try { initMonsterSystem(scene); }     catch (e) {}
 
       try {
         initSelectionSystem(scene, (info) => handleStateChange({ selected: info }));
