@@ -23,9 +23,10 @@ const K_DIAMOND = (GRID_COLS + GRID_ROWS - 2) * (TILE_W / 2); // 16320 for 256×
  *  2. Sees at most 50% of each map span (~25% total map area)
  */
 export function computeMinZoom(cw: number, ch: number): number {
-  // Constraint 1 (no void): K_DIAMOND * zoom >= cw/2 + ch
-  const noVoid = (cw / 2 + ch) / K_DIAMOND;
-  // Constraint 2 (25% coverage): viewport <= 50% of each map span
+  // No-void constraint (derived from diamond edge geometry):
+  //   K_DIAMOND * zoom >= cw + 2*ch
+  const noVoid = (cw + 2 * ch) / K_DIAMOND;
+  // 25%-coverage: viewport <= 50% of each map span
   const mapIsoW = MAP_ISO_MAX_X - MAP_ISO_MIN_X;
   const mapIsoH = MAP_ISO_MAX_Y - MAP_ISO_MIN_Y;
   const coverage = Math.max((2 * cw) / mapIsoW, (2 * ch) / mapIsoH);
@@ -77,10 +78,10 @@ export function screenToTile(
 export function clampCamera(camX: number, camY: number, zoom: number, cw: number, ch: number) {
   const K = K_DIAMOND * zoom;
 
-  // Independent bounds in rotated space
+  // Independent bounds in rotated space (derived from the 4 diamond edge conditions)
   const P_min = cw;
-  const P_max = 2 * K - 2 * ch;
-  const Q_min = cw + 2 * ch - 2 * K;
+  const P_max = K - 2 * ch;
+  const Q_min = cw + 2 * ch - K;
   const Q_max = 0;
 
   // Safety: if zoom is below the mathematical minimum, center the camera
