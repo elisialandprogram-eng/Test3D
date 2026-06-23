@@ -259,15 +259,6 @@ export function IsoWorld({ onHover }: IsoWorldProps) {
       drawTile(ctx, sx, sy, zoom, t);
     }
 
-    // Pass 2: trees
-    for (const [col, row] of tiles) {
-      const t = terrain[row][col];
-      const entity = entityMap.get(`${col},${row}`);
-      if (entity) continue; // skip trees on entity tiles — sprite will cover them
-      const { x: sx, y: sy } = tileToScreen(col, row, camX, camY, zoom);
-      drawTrees(ctx, sx, sy, zoom, col, row, t);
-    }
-
     // Pass 3: entity sprites (sorted back-to-front via renderOrder already)
     for (const [col, row] of tiles) {
       const entity = entityMap.get(`${col},${row}`);

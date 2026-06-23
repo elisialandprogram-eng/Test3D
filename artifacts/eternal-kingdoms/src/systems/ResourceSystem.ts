@@ -19,7 +19,6 @@ interface ResourceConfig {
 }
 
 const RESOURCE_CONFIGS: ResourceConfig[] = [
-  { type: "Wood",  count: 420, color: new Color3(0.15, 0.45, 0.10), emissive: new Color3(0.01, 0.05, 0.00), shape: "tree"    },
   { type: "Stone", count: 320, color: new Color3(0.60, 0.57, 0.52), emissive: new Color3(0.02, 0.02, 0.02), shape: "boulder" },
   { type: "Food",  count: 270, color: new Color3(0.90, 0.75, 0.12), emissive: new Color3(0.06, 0.04, 0.00), shape: "wheat"   },
   { type: "Gold",  count: 210, color: new Color3(1.00, 0.82, 0.05), emissive: new Color3(0.28, 0.16, 0.00), shape: "crystal" },
